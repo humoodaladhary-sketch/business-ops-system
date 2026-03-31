@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QM KPI Dashboard — Hamood Al Adhari | Oman Broadband</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>Quality Management KPI Dashboard</h1>
+            <div class="subtitle">Hamood Al Adhari — Senior QM Engineer — Oman Broadband</div>
+        </div>
+        <div class="date" id="report-date"></div>
+    </div>
+
+    <div class="container">
+        <!-- Score Banner -->
+        <div class="score-banner" id="score-banner">
+            <div class="score-main">
+                <div class="label">Overall KPI Score</div>
+                <div class="value" id="overall-score">--</div>
+                <div class="rating" id="rating-badge">Loading...</div>
+            </div>
+            <div class="score-stats">
+                <div class="score-stat stat-red">
+                    <div class="num" id="behind-count">-</div>
+                    <div class="lbl">Behind</div>
+                </div>
+                <div class="score-stat stat-yellow">
+                    <div class="num" id="at-risk-count">-</div>
+                    <div class="lbl">At Risk</div>
+                </div>
+                <div class="score-stat stat-green">
+                    <div class="num" id="sat-compliance">-</div>
+                    <div class="lbl">SAT SLA %</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI Table -->
+        <div class="card full-width">
+            <h2>KPI Performance Tracker</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Priority</th>
+                        <th>KPI</th>
+                        <th>Weight</th>
+                        <th>Target</th>
+                        <th>Actual</th>
+                        <th>Progress</th>
+                        <th>Score</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="kpi-table-body"></tbody>
+            </table>
+        </div>
+
+        <!-- SAT SLA + Audit side by side -->
+        <div class="section-title">Priority Focus: SAT SLA & Audit</div>
+        <div class="grid-2">
+            <div class="card">
+                <h2>SAT SLA Compliance</h2>
+                <div id="sat-summary"></div>
+                <table>
+                    <thead>
+                        <tr><th>Site</th><th>Region</th><th>SLA Deadline</th><th>HO Docs</th><th>Pre-Check</th><th>Status</th></tr>
+                    </thead>
+                    <tbody id="sat-table-body"></tbody>
+                </table>
+            </div>
+            <div class="card">
+                <h2>Data Center Audit Status</h2>
+                <div id="audit-summary"></div>
+                <table>
+                    <thead>
+                        <tr><th>DC</th><th>Category</th><th>Item</th><th>Status</th></tr>
+                    </thead>
+                    <tbody id="audit-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Risks -->
+        <div class="section-title">Risk Register</div>
+        <div class="card">
+            <h2>Active Risks — Ordered by Severity</h2>
+            <div id="risks-container"></div>
+        </div>
+
+        <!-- CQI Ideas -->
+        <div class="section-title">CQI Ideas</div>
+        <div class="card">
+            <h2>Continual Quality Improvement Proposals</h2>
+            <table>
+                <thead>
+                    <tr><th>Idea</th><th>Category</th><th>KPI Affected</th><th>Impact</th><th>Effort</th><th>Status</th></tr>
+                </thead>
+                <tbody id="cqi-table-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="/static/dashboard.js"></script>
+</body>
+</html>

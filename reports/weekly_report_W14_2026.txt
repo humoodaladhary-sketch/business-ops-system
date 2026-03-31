@@ -1,0 +1,82 @@
+======================================================================
+WEEKLY KPI STATUS REPORT — WEEK 14, 2026
+Engineer: Hamood Al Adhari | Senior QM Engineer | Oman Broadband
+Report Date: 31 March 2026
+======================================================================
+
+OVERALL SCORE: 53.1% — NEEDS IMPROVEMENT
+KPIs Behind: 1 | KPIs At Risk: 5
+
+----------------------------------------------------------------------
+KPI PERFORMANCE SUMMARY
+----------------------------------------------------------------------
+ P KPI                                   Wt   Target   Actual  Score Status      
+----------------------------------------------------------------------
+ 1 SAT SLA Compliance                   20%      95      82  17.3 at_risk     
+ 2 Data Center Audit Completion         15%     100      35   5.2 at_risk     
+ 3 Monthly QM Reports                   15%      12       3   3.8 on_track    
+ 4 Maintenance KPI Achievement          15%      90      78  13.0 at_risk     
+ 5 LTIF (Lost Time Injury Frequency)    10%       0       0   0.0 on_track    
+ 6 Process Automation Initiatives       10%       4       1   2.5 at_risk     
+ 7 Customer Satisfaction Score           5%      85      79   4.6 at_risk     
+ 8 OPEX Budget Compliance                5%     100      94   4.7 on_track    
+ 9 Mobile Network Integration QA         5%     100      40   2.0 behind      
+
+----------------------------------------------------------------------
+SAT SLA STATUS (Priority 1 — 20%)
+----------------------------------------------------------------------
+Compliance Rate: 12.5%
+Total Sites: 8 | On Time: 1 | Delayed: 0
+Missing HO Documents: 5
+No Pre-Check Done: 4
+RISK FLAG: HIGH — HO docs incomplete
+
+SAT RISKS:
+  [CRITICAL] MUS-001 — Muscat Exchange Hub — Deadline: 2026-04-05 — Days left: 5
+           Action: URGENT: Chase HO documents from contractor | Resolve 5 outstanding snags
+  [CRITICAL] SOH-001 — Sohar Industrial DC — Deadline: 2026-04-08 — Days left: 8
+           Action: URGENT: Chase HO documents from contractor | Schedule and complete pre-check immediately
+  [CRITICAL] SAL-001 — Salalah Broadband Center — Deadline: 2026-04-15 — Days left: 15
+           Action: URGENT: Chase HO documents from contractor | Schedule and complete pre-check immediately
+  [CRITICAL] SUR-001 — Sur Coastal Node — Deadline: 2026-04-02 — Days left: 2
+           Action: URGENT: Chase HO documents from contractor | Schedule and complete pre-check immediately | Escalate to management — SLA breach imminent | Resolve 4 outstanding snags
+  [CRITICAL] IBA-001 — Ibra Junction Hub — Deadline: 2026-04-03 — Days left: 3
+           Action: URGENT: Chase HO documents from contractor | Resolve 3 outstanding snags
+
+----------------------------------------------------------------------
+DATA CENTER AUDIT STATUS (Priority 2 — 15%)
+----------------------------------------------------------------------
+Total Items: 10 | Compliant: 3 | Non-Compliant: 1
+Compliance Rate: 30.0%
+
+----------------------------------------------------------------------
+ACTIVE RISKS
+----------------------------------------------------------------------
+  [MEDIUM] Mobile integration QA at 40% — lowest performing KPI
+           KPI: Mobile Integration (5%) | Mitigation: 1) Align with mobile team on test plan 2) Block 2 days/week for mobile QA 3) Esc...
+  [MEDIUM] Process automation only 1/4 projects completed in Q1
+           KPI: Process Automation (10%) | Mitigation: 1) Identify 2 quick-win automation projects for Q2 2) Leverage this KPI system a...
+  [HIGH] Data center audit Q2 scope too large for single engineer
+           KPI: Data Center Audit (15%) | Mitigation: 1) Request audit support resource 2) Pre-schedule all Q2 audit dates now 3) Comp...
+  [HIGH] Maintenance KPIs underperforming at 78% vs 90% target
+           KPI: Maintenance KPIs (15%) | Mitigation: 1) Root-cause analysis on failed maintenance items 2) Weekly maintenance review ...
+  [CRITICAL] Incomplete HO documents from contractors causing SAT SLA breaches
+           KPI: SAT SLA (20%) | Mitigation: 1) Implement mandatory pre-check gate 2) Weekly contractor follow-up emails 3) E...
+
+----------------------------------------------------------------------
+REQUIRED ACTIONS THIS WEEK
+----------------------------------------------------------------------
+  1. URGENT: Chase HO documents for MUS-001 (Muscat Exchange Hub) — deadline 2026-04-05
+  2. URGENT: Chase HO documents for SOH-001 (Sohar Industrial DC) — deadline 2026-04-08
+  3. URGENT: Chase HO documents for SAL-001 (Salalah Broadband Center) — deadline 2026-04-15
+  4. URGENT: Chase HO documents for SUR-001 (Sur Coastal Node) — deadline 2026-04-02
+  5. URGENT: Chase HO documents for IBA-001 (Ibra Junction Hub) — deadline 2026-04-03
+  6. Send escalation email to contractors for 5 sites with missing HO documents
+  7. Schedule pre-checks for 3 sites immediately
+  8. Close 1 non-compliant audit findings with corrective actions
+  9. Begin 5 pending audit items — schedule site visits
+  10. Recovery plan needed: Mobile Network Integration QA at 40.0/100.0
+
+======================================================================
+END OF REPORT
+======================================================================
