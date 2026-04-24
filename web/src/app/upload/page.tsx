@@ -1,17 +1,18 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 type Stage = "idle" | "uploading" | "extracting" | "done" | "error";
 
 export default function UploadPage() {
+  const router = useRouter();
   const [projectName, setProjectName] = useState("");
   const [developer, setDeveloper] = useState("");
   const [zone, setZone] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [stage, setStage] = useState<Stage>("idle");
   const [message, setMessage] = useState<string | null>(null);
-  const [result, setResult] = useState<unknown>(null);
 
   function onFiles(selected: FileList | null) {
     if (!selected) return;
@@ -38,8 +39,8 @@ export default function UploadPage() {
       if (!resp.ok) throw new Error(body.error ?? "Extraction failed");
 
       setStage("done");
-      setMessage(`Extracted ${body.units?.length ?? 0} units.`);
-      setResult(body);
+      setMessage(`Extracted ${body.unit_count ?? 0} units. Redirecting…`);
+      setTimeout(() => router.push("/inventory"), 1200);
     } catch (err) {
       setStage("error");
       setMessage((err as Error).message);
@@ -108,14 +109,6 @@ export default function UploadPage() {
         )}
       </div>
 
-      {stage === "done" && result !== null && (
-        <section className="card p-6">
-          <h2 className="font-display text-xl mb-2">Extracted</h2>
-          <pre className="text-xs bg-[var(--color-brand-gray-50)] p-3 rounded-sm overflow-x-auto">
-            {JSON.stringify(result, null, 2)}
-          </pre>
-        </section>
-      )}
     </div>
   );
 }
