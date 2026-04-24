@@ -1,0 +1,16 @@
+# Alwalaa brand theme — applied automatically by Streamlit.
+# Matches config/branding.yaml visual section.
+
+[theme]
+primaryColor = "#0B3D2E"            # deep emerald
+backgroundColor = "#F5F1EA"         # warm ivory
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#1a1a1a"
+font = "serif"
+
+[server]
+headless = true
+runOnSave = false
+
+[browser]
+gatherUsageStats = false

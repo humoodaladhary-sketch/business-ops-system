@@ -124,12 +124,18 @@ if "agent" not in st.session_state:
 with st.sidebar:
     st.header("⚙️ Settings")
 
-    api_key_env = os.getenv("ANTHROPIC_API_KEY", "")
+    # Look for the key in Streamlit Cloud secrets first, then env, then UI input.
+    try:
+        api_key_default = st.secrets.get("ANTHROPIC_API_KEY", "")
+    except Exception:
+        api_key_default = ""
+    if not api_key_default:
+        api_key_default = os.getenv("ANTHROPIC_API_KEY", "")
     api_key = st.text_input(
         "Anthropic API key",
-        value=api_key_env,
+        value=api_key_default,
         type="password",
-        help="Falls back to ANTHROPIC_API_KEY env var.",
+        help="Reads from Streamlit secrets / ANTHROPIC_API_KEY env var. Override here for ad-hoc use.",
     )
 
     st.subheader("Platforms")
