@@ -55,7 +55,29 @@ cp .env.example .env
 # add your ANTHROPIC_API_KEY to .env
 ```
 
-## Usage
+## Launch the web app (recommended)
+
+```bash
+streamlit run app.py
+```
+
+Opens at `http://localhost:8501`. From the browser you can:
+
+- **Upload an inventory** (CSV/XLSX) and see every property listed.
+- **Attach renders and a sales-offer PDF** per property.
+- **Pick platforms and currencies** in the sidebar.
+- **Generate** with one click — you'll see live progress (vision, market
+  research, copywriting).
+- **Copy** the title, body, CTA, and hashtags per platform with character
+  counters that turn red when over the limit.
+- **Download all listings as a ZIP** ready to hand to the marketing team.
+
+There's also a **Single property** tab with a quick form if you don't want
+to upload a full inventory.
+
+## CLI
+
+For batch jobs, automation, or CI use the CLI.
 
 ### Generate for every property in an inventory
 
