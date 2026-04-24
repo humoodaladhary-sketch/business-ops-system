@@ -1,165 +1,91 @@
 # Alwalaa AI Listing Agent
 
-AI-powered property-listing generator for the Alwalaa brokerage. Takes an
-inventory sheet plus optional renders and sales-offer PDFs, researches the
-live market, and produces ready-to-publish listings across the Alwalaa
-website, Instagram, Dubizzle, OpenSouq, Bayut, and Property Finder — in
-English and Arabic, with multi-currency pricing, branded CTAs, and
-platform-specific character limits enforced automatically.
+Private, elite, one-click real-estate intelligence system for **Alwalaa Real Estate** (Sultanate of Oman).
 
-## What it does
+> Upload an Oman project pack — inventory, brochures, renders, payment plans — and get investor-grade listings, WhatsApp pitches, comparison reports, and branded PDFs in under five minutes. Oman-specific: ITC freehold, Sultan Haitham City, Muscat yield bands built into every prompt.
 
-- **Reads your inventory** — CSV or Excel. Tolerant column mapping: `beds`,
-  `bedrooms`, `br` all map to the same field.
-- **Analyzes your renders** — Claude's vision API captions each image, tags
-  the room, and flags hero-shot candidates.
-- **Extracts sales-offer PDFs** — pulls the text so the model can cite the
-  facts you put in your own collateral.
-- **Researches the market** — Claude uses the web-search tool to find 3-6
-  recent comparable listings on Bayut, Property Finder, Dubizzle, etc.,
-  then synthesizes a price range and positioning note.
-- **Writes per-platform listings** — one markdown file per platform and
-  language, with the approved brand CTAs and an enforced character budget.
-- **Builds multi-currency price tables** — AED/USD/EUR/GBP/SAR by default,
-  configurable.
-- **Stays on brand** — the voice, visual palette, forbidden words,
-  preferred verbs, and compliance disclosures live in `config/branding.yaml`
-  and are pushed into a cached system prompt, so every call after the first
-  is cheap.
+**Prepared for:** Humood Aladhari, CEO, Alwalaa Real Estate.
 
-## Repository layout
+---
+
+## Repository map
 
 ```
-.
-├── cli.py                        # CLI entry point
-├── config/
-│   ├── branding.yaml             # Alwalaa brand book (tone, colors, CTAs, amenities)
-│   └── platforms.yaml            # Platform rules (char limits, languages, sections)
-├── property_agent/
-│   ├── models.py                 # Pydantic models (Property, Listing, ...)
-│   ├── inputs.py                 # Inventory/PDF/render ingestion
-│   ├── pricing.py                # Multi-currency price tables
-│   ├── prompts.py                # System + user prompt templates
-│   ├── agent.py                  # Claude orchestrator (vision + web search + copy)
-│   └── output.py                 # Disk writer (one folder per property)
-├── sample_data/
-│   └── sample_inventory.csv      # 4 example properties
-└── requirements.txt
+├── docs/                            ← Product documentation
+│   ├── PRD.md                        Product requirements
+│   ├── ARCHITECTURE.md               System architecture
+│   ├── DATABASE_SCHEMA.sql           Supabase schema (paste-ready)
+│   ├── PROMPT_TEMPLATES.md           AI prompt library (the IP)
+│   ├── WIREFRAMES.md                 UI/UX wireframes
+│   ├── OUTPUT_EXAMPLES.md            Real example listings + reports
+│   ├── MVP_BUILD_PLAN.md             Milestones + effort estimates
+│   └── DEPLOY.md                     Vercel + Supabase deploy walkthrough
+├── web/                             ← Next.js 15 + TypeScript + Tailwind v4 + Supabase
+│   ├── src/app/                      Pages + API routes
+│   ├── src/lib/prompts/              Oman-specific prompt library
+│   ├── src/lib/parsers/              Excel + PDF parsing
+│   └── ...
+└── archive/
+    └── streamlit-uae/               ← v0 prototype (UAE-focused), superseded
 ```
 
-## Setup
+---
 
-```bash
-pip install -r requirements.txt
-cp .env.example .env
-# add your ANTHROPIC_API_KEY to .env
-```
+## Stack
 
-## Launch the web app (recommended)
+- **Next.js 15** App Router · **React 19** · **TypeScript**
+- **Tailwind CSS v4** with Alwalaa brand theme (black · gold · white)
+- **Supabase** — Postgres, Storage, Auth (magic link)
+- **Anthropic Claude Opus 4.7** — vision, adaptive thinking, prompt caching
+- **Vercel** — hosting + auto-deploy from GitHub
 
-```bash
-streamlit run app.py
-```
+---
 
-Opens at `http://localhost:8501`. From the browser you can:
+## What this MVP does
 
-- **Upload an inventory** (CSV/XLSX) and see every property listed.
-- **Attach renders and a sales-offer PDF** per property.
-- **Pick platforms and currencies** in the sidebar.
-- **Generate** with one click — you'll see live progress (vision, market
-  research, copywriting).
-- **Copy** the title, body, CTA, and hashtags per platform with character
-  counters that turn red when over the limit.
-- **Download all listings as a ZIP** ready to hand to the marketing team.
+| Feature | Status |
+|---|---|
+| Drag-drop upload: Excel + PDF + renders | ✅ |
+| AI extraction of units with source-tagged fields | ✅ (stateless) |
+| Multi-platform listing generation (PF, OLX, IG, WhatsApp, LinkedIn, Website) | ✅ (stateless) |
+| Bilingual output (English + Arabic) | ✅ |
+| ROI + liquidity + appreciation scoring | ✅ API route |
+| Buyer profile prediction (nationality, motivation, objections) | ✅ API route |
+| Comparison reports (3 units + recommendation + WhatsApp pitch) | ✅ API route |
+| Dashboard + upload UI | ✅ |
+| Persistence (Supabase) | ⏳ Milestone M1 |
+| Inventory UI with filters | ⏳ Milestone M1 |
+| Listing tabs UI + copy/edit | ⏳ Milestone M2 |
+| Audit (source badges) UI | ⏳ Milestone M3 |
+| Comparison UI + PDF export | ⏳ Milestone M4 |
+| Auth + production hardening | ⏳ Milestone M5 |
 
-There's also a **Single property** tab with a quick form if you don't want
-to upload a full inventory.
+Full milestone breakdown and effort estimates: [`docs/MVP_BUILD_PLAN.md`](docs/MVP_BUILD_PLAN.md).
 
-## CLI
+---
 
-For batch jobs, automation, or CI use the CLI.
+## Deploy now
 
-### Generate for every property in an inventory
+See [`docs/DEPLOY.md`](docs/DEPLOY.md) for the step-by-step Supabase + Vercel walkthrough (beginner-friendly, ~25 min first time).
 
-```bash
-python cli.py batch --inventory sample_data/sample_inventory.csv
-```
+---
 
-### Single property with renders and a sales offer
+## Oman-specific intelligence
 
-```bash
-python cli.py single \
-    --inventory sample_data/sample_inventory.csv \
-    --reference ALW-PALM-2045 \
-    --renders "renders/palm/*.jpg" \
-    --offer offers/palm_2045.pdf \
-    --platform website \
-    --platform instagram
-```
+The real IP of the system is the prompt library in `web/src/lib/prompts/`. Every call uses a shared system prompt that encodes:
 
-### Skip market research (faster, offline-friendlier)
+- **ITC mechanics** — which zones are freehold, which aren't, what residency benefits come with ownership.
+- **Sultan Haitham City thesis** — government-backed smart-city positioning with infrastructure pipeline notes.
+- **Muscat yield bands** — 2025 working assumptions by unit type, with +50bps adjustments for ITC/SHC/sea view.
+- **Alwalaa brand voice** — elegant, direct, investor-first. Forbidden-word list enforced.
+- **Approved CTAs** (EN + AR) — the AI can only pick from this list.
+- **Separation of extracted / inferred / assumed / missing** — every field traceable to a source file.
 
-```bash
-python cli.py batch --inventory inv.csv --no-research
-```
+See [`docs/PROMPT_TEMPLATES.md`](docs/PROMPT_TEMPLATES.md) for the full human-reviewable library.
 
-### Change target currencies
+---
 
-```bash
-python cli.py batch --inventory inv.csv --currencies "AED,USD,EUR,INR,CNY,RUB"
-```
+## The old Streamlit prototype
 
-## Output
-
-Each property gets a folder under `./generated/<reference_id>/`:
-
-```
-generated/ALW-PALM-2045/
-├── website_en.md
-├── website_ar.md
-├── instagram_en.md
-├── instagram_ar.md
-├── dubizzle_en.md
-├── opensouq_en.md
-├── opensouq_ar.md
-├── bayut_en.md
-├── property_finder_en.md
-├── market_research.md
-└── listing.json                  # everything, machine-readable
-```
-
-Each `.md` is ready to paste into the target platform.
-
-## Tuning the brand
-
-Everything the copywriter AI knows about Alwalaa lives in
-`config/branding.yaml`. Edit the brand voice, color palette, amenity
-vocabulary, compliance disclosures, or the approved CTA list and the next
-`python cli.py ...` run picks it up — no code changes.
-
-Platform rules (character limits, required sections, language set, hashtag
-policy) live in `config/platforms.yaml`. Add a new portal by appending a
-block there.
-
-## How it uses Claude
-
-- **Model:** `claude-opus-4-7` throughout.
-- **Adaptive thinking** on every listing call, so the model chooses how
-  hard to think based on complexity.
-- **Prompt caching** on the brand book + platform specs — the stable
-  ~10-20K-token system prompt is cached with `cache_control: ephemeral`,
-  so every call after the first pays ~10% of the input price on that
-  prefix.
-- **Vision** for render analysis (base64 inline; swap in the Files API if
-  you have hundreds of images).
-- **Web search server tool** for market research — Claude runs the
-  comparable-listing queries itself.
-- **Strict JSON outputs** parsed defensively (code-fence stripping,
-  balanced-brace extraction).
-
-## Extension points
-
-- Swap `EXCHANGE_RATES` in `property_agent/pricing.py` for a live FX feed.
-- Add platforms by appending to `config/platforms.yaml`.
-- Plug a Files API uploader into `inputs.py` if render galleries grow large.
-- Add a Skills-based backend for per-user memory of broker preferences.
+The previous (UAE-focused) version is preserved in `archive/streamlit-uae/` for
+reference. The new Oman-specific Next.js version supersedes it completely.
