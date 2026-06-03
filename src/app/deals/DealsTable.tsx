@@ -1,24 +1,26 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { DEALS, AGENTS } from "../_data/dataset";
+import { AGENTS, type DealRecord } from "../_data/dataset";
 import { formatOMR, formatRate } from "../lib/format";
 import { Badge } from "../components/ui";
 
 const AGENT_NAME = new Map(AGENTS.map((a) => [a.id, a.name]));
 
-export function DealsTable() {
+export function DealsTable({ deals, showAgentFilter = true }: { deals: DealRecord[]; showAgentFilter?: boolean }) {
   const [agent, setAgent] = useState("ALL");
   const [paid, setPaid] = useState("ALL");
 
   const rows = useMemo(() => {
-    return DEALS.filter((d) => {
-      if (agent !== "ALL" && d.agentId !== agent) return false;
-      if (paid === "PAID" && d.agentPaid !== "PAID") return false;
-      if (paid === "UNPAID" && d.agentPaid === "PAID") return false;
-      return true;
-    }).sort((a, b) => (b.closeDate ?? "").localeCompare(a.closeDate ?? ""));
-  }, [agent, paid]);
+    return deals
+      .filter((d) => {
+        if (showAgentFilter && agent !== "ALL" && d.agentId !== agent) return false;
+        if (paid === "PAID" && d.agentPaid !== "PAID") return false;
+        if (paid === "UNPAID" && d.agentPaid === "PAID") return false;
+        return true;
+      })
+      .sort((a, b) => (b.closeDate ?? "").localeCompare(a.closeDate ?? ""));
+  }, [deals, agent, paid, showAgentFilter]);
 
   const totalValue = rows.reduce((s, d) => s + d.value, 0);
   const totalGross = rows.reduce((s, d) => s + d.gross, 0);
@@ -28,12 +30,14 @@ export function DealsTable() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <select value={agent} onChange={(e) => setAgent(e.target.value)} className="rounded-md border border-hairline bg-ink-100 px-2.5 py-2 text-sm text-white/80 focus:border-gold/50 focus:outline-none">
-          <option value="ALL">All agents</option>
-          {AGENTS.filter((a) => DEALS.some((d) => d.agentId === a.id)).map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
-          ))}
-        </select>
+        {showAgentFilter && (
+          <select value={agent} onChange={(e) => setAgent(e.target.value)} className="rounded-md border border-hairline bg-ink-100 px-2.5 py-2 text-sm text-white/80 focus:border-gold/50 focus:outline-none">
+            <option value="ALL">All agents</option>
+            {AGENTS.filter((a) => deals.some((d) => d.agentId === a.id)).map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+        )}
         <select value={paid} onChange={(e) => setPaid(e.target.value)} className="rounded-md border border-hairline bg-ink-100 px-2.5 py-2 text-sm text-white/80 focus:border-gold/50 focus:outline-none">
           <option value="ALL">All payment states</option>
           <option value="PAID">Agent paid</option>

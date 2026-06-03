@@ -136,7 +136,11 @@ tested (`src/domain/__tests__`).
 - ✅ **Phase 3** — Commission engine in `/domain` with full unit-test coverage
 - ✅ **Phase 4** — Branded dashboards (Thursday view, leaderboard, performance, pipeline, commissions, tier widget)
 - ✅ **Phase 5** — Alert/automation API (at-risk webhook) ready for n8n + WhatsApp
-- ⏭️ **Phase 6** — Supabase auth + Row-Level Security (agents see own data + leaderboard; CEO sees all)
+- ✅ **Phase 6** — Auth + role-based access. Supabase email auth when configured
+  (`NEXT_PUBLIC_SUPABASE_URL`/anon key), a secure cookie demo login otherwise; route-gating
+  middleware; **server-side data scoping** (agents see only their own leads/deals/workspace/
+  commissions + the shared leaderboard; CEO/admin sees all); and **RLS policies**
+  (`supabase/migrations`) enforcing the same at the database.
 
 ## Brand
 

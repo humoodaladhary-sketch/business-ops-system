@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AGENTS, DEALS, LEADS } from "../_data/dataset";
 import { Card, Badge } from "../components/ui";
 import { formatOMR } from "../lib/format";
+import { requireSession } from "@/infrastructure/auth/session";
 
 export const metadata = { title: "Agents · Alwalaa CRM" };
 
@@ -16,7 +18,9 @@ const ROLE_LABEL: Record<string, string> = {
   CEO: "CEO",
 };
 
-export default function AgentsPage() {
+export default async function AgentsPage() {
+  const session = await requireSession();
+  if (session.role !== "ADMIN") redirect(session.agentId ? `/agents/${session.agentId}` : "/");
   return (
     <div className="space-y-7">
       <div>

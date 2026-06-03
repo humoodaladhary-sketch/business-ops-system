@@ -1,19 +1,18 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { AGENTS, getAgent, dealsForAgent, leadsForAgent } from "../../_data/dataset";
+import { notFound, redirect } from "next/navigation";
+import { getAgent, dealsForAgent, leadsForAgent } from "../../_data/dataset";
+import { requireSession, canViewAgent } from "@/infrastructure/auth/session";
 import { phoneMeta } from "../../lib/phone";
 import { Card, SectionTitle, StatTile, Badge } from "../../components/ui";
 import { formatOMR, formatRate } from "../../lib/format";
 import { agentStats, bucketize, dealsFor } from "../../_data/analytics";
 import { STAGE_LABELS, type CanonicalStage } from "@/domain";
 
-export function generateStaticParams() {
-  return AGENTS.map((a) => ({ id: a.id }));
-}
-
-export default function AgentWorkspace({ params }: { params: { id: string } }) {
+export default async function AgentWorkspace({ params }: { params: { id: string } }) {
+  const session = await requireSession();
   const agent = getAgent(params.id);
   if (!agent) notFound();
+  if (!canViewAgent(session, agent.id)) redirect(session.agentId ? `/agents/${session.agentId}` : "/");
 
   const deals = dealsForAgent(agent.id);
   const leads = leadsForAgent(agent.id);

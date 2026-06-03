@@ -1,9 +1,12 @@
 import { getDemoCommissions, DEMO_PERIOD } from "../_data/demo";
 import { Card, SectionTitle, StatTile, Badge } from "../components/ui";
 import { formatOMR, formatRate } from "../lib/format";
+import { requireSession, isAdmin } from "@/infrastructure/auth/session";
 
-export default function CommissionsPage() {
-  const rows = getDemoCommissions();
+export default async function CommissionsPage() {
+  const session = await requireSession();
+  const all = getDemoCommissions();
+  const rows = isAdmin(session) ? all : all.filter((r) => r.agentId === session.agentId);
   const totalGross = rows.reduce((s, r) => s + r.alwalaaGross, 0);
   const totalPayout = rows.reduce((s, r) => s + r.agentPayout, 0);
 

@@ -1,0 +1,85 @@
+// Server-side auth/session. Uses Supabase when configured
+// (NEXT_PUBLIC_SUPABASE_URL + anon key), otherwise a signed-by-httpOnly demo
+// cookie so the app is fully usable on the preview. Authorization scoping below
+// is the real enforcement at the app layer; RLS (supabase/migrations) enforces
+// it again at the database for production.
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { createServerClient } from "@supabase/ssr";
+
+export type Role = "ADMIN" | "AGENT";
+
+export interface Session {
+  userId: string;
+  email: string;
+  name: string;
+  role: Role;
+  agentId: string | null; // null for admins
+}
+
+export const DEMO_COOKIE = "alwalaa_demo_session";
+
+export function isSupabaseConfigured(): boolean {
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+}
+
+export function supabaseServer() {
+  const store = cookies();
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => store.getAll(),
+        setAll: (list: { name: string; value: string; options?: Record<string, unknown> }[]) => {
+          try {
+            list.forEach(({ name, value, options }) => store.set(name, value, options as never));
+          } catch {
+            /* called from a Server Component — safe to ignore */
+          }
+        },
+      },
+    },
+  );
+}
+
+export async function getSession(): Promise<Session | null> {
+  if (isSupabaseConfigured()) {
+    const { data } = await supabaseServer().auth.getUser();
+    const user = data.user;
+    if (!user) return null;
+    const meta = (user.app_metadata ?? {}) as { role?: Role; agent_id?: string };
+    return {
+      userId: user.id,
+      email: user.email ?? "",
+      name: (user.user_metadata?.name as string) ?? user.email ?? "User",
+      role: meta.role ?? "AGENT",
+      agentId: meta.agent_id ?? null,
+    };
+  }
+  const raw = cookies().get(DEMO_COOKIE)?.value;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as Session;
+  } catch {
+    return null;
+  }
+}
+
+export async function requireSession(): Promise<Session> {
+  const s = await getSession();
+  if (!s) redirect("/login");
+  return s;
+}
+
+export const isAdmin = (s: Session | null): boolean => s?.role === "ADMIN";
+
+/** Which agent's data a session may see in a scoped view: 'ALL' for admins. */
+export function visibleScope(s: Session): string | "ALL" {
+  return s.role === "ADMIN" ? "ALL" : s.agentId ?? "__none__";
+}
+
+/** Whether a session may view a particular agent's private workspace. */
+export function canViewAgent(s: Session, agentId: string): boolean {
+  return s.role === "ADMIN" || s.agentId === agentId;
+}

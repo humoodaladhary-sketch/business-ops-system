@@ -2,10 +2,13 @@ import { teamTotals } from "../_data/analytics";
 import { StatTile, Card } from "../components/ui";
 import { formatOMR } from "../lib/format";
 import { AnalyticsClient } from "./AnalyticsClient";
+import { requireSession, isAdmin } from "@/infrastructure/auth/session";
 
 export const metadata = { title: "Analytics · Alwalaa CRM" };
 
-export default function AnalyticsPage() {
+export default async function AnalyticsPage() {
+  const session = await requireSession();
+  const admin = isAdmin(session);
   const t = teamTotals();
   return (
     <div className="space-y-7">
@@ -30,7 +33,7 @@ export default function AnalyticsPage() {
         paid to the agent; &quot;Pending&quot; = booked but not yet paid; &quot;Receivable&quot; = developer commission Alwalaa is still owed.
       </Card>
 
-      <AnalyticsClient />
+      <AnalyticsClient isAdmin={admin} meAgentId={session.agentId} />
     </div>
   );
 }

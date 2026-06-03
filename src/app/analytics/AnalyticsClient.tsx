@@ -21,10 +21,11 @@ const GRAINS: [Grain, string][] = [
 const MEDALS = ["🥇", "🥈", "🥉"];
 const SALES = AGENTS.filter((a) => ["SENIOR", "ADVISOR", "NEW"].includes(a.role) && a.status !== "FORMER");
 
-export function AnalyticsClient() {
+export function AnalyticsClient({ isAdmin = true, meAgentId = null }: { isAdmin?: boolean; meAgentId?: string | null }) {
   const [metric, setMetric] = useState<Metric>("volume");
-  const [agent, setAgent] = useState<string>("ALL");
+  const [agent, setAgent] = useState<string>(isAdmin ? "ALL" : meAgentId ?? "ALL");
   const [grain, setGrain] = useState<Grain>("month");
+  const meName = AGENTS.find((a) => a.id === meAgentId)?.name ?? "Me";
 
   const ranked = useMemo(() => ranking(metric), [metric]);
   const buckets = useMemo(() => bucketize(dealsFor(agent as "ALL"), grain), [agent, grain]);
@@ -77,10 +78,14 @@ export function AnalyticsClient() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <SectionTitle sub="Closings & commission over time.">Time breakdown</SectionTitle>
           <div className="flex gap-2">
-            <select value={agent} onChange={(e) => setAgent(e.target.value)} className="rounded-md border border-hairline bg-ink-100 px-2.5 py-2 text-sm text-white/80 focus:border-gold/50 focus:outline-none">
-              <option value="ALL">Whole team</option>
-              {SALES.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+            {isAdmin ? (
+              <select value={agent} onChange={(e) => setAgent(e.target.value)} className="rounded-md border border-hairline bg-ink-100 px-2.5 py-2 text-sm text-white/80 focus:border-gold/50 focus:outline-none">
+                <option value="ALL">Whole team</option>
+                {SALES.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            ) : (
+              <span className="rounded-md border border-hairline bg-ink-100 px-2.5 py-2 text-sm text-white/60">{meName}</span>
+            )}
             <select value={grain} onChange={(e) => setGrain(e.target.value as Grain)} className="rounded-md border border-hairline bg-ink-100 px-2.5 py-2 text-sm text-white/80 focus:border-gold/50 focus:outline-none">
               {GRAINS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>

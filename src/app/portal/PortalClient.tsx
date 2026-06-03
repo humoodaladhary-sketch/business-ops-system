@@ -9,9 +9,10 @@ const NAME = new Map(AGENTS.map((a) => [a.id, a.name]));
 const POOL = ROUTING_POOL.map((id) => ({ id, name: NAME.get(id) ?? id }));
 const STAGES = ["ENGAGED", "VIEWING", "NEGOTIATION", "RESERVATION", "CLOSED_WON", "CLOSED_LOST"];
 
-export function PortalClient() {
+export function PortalClient({ role, myAgentId }: { role: "ADMIN" | "AGENT"; myAgentId: string | null }) {
+  const isAdmin = role === "ADMIN";
   const [items, setItems] = useState<Assignment[]>([]);
-  const [me, setMe] = useState<string>(POOL[0].id);
+  const [me, setMe] = useState<string>(!isAdmin && myAgentId ? myAgentId : POOL[0].id);
   const [, setTick] = useState(0);
 
   const refresh = useCallback(async () => {
@@ -20,22 +21,21 @@ export function PortalClient() {
     setItems(j.assignments ?? []);
   }, []);
 
-  const act = useCallback(
-    async (action: string, leadId: string, extra: Record<string, string> = {}) => {
-      const r = await fetch("/api/portal/action", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action, leadId, ...extra }),
-      });
-      const j = await r.json();
-      if (j.assignments) setItems(j.assignments);
-    },
-    [],
-  );
+  const act = useCallback(async (action: string, leadId: string, extra: Record<string, string> = {}) => {
+    const r = await fetch("/api/portal/action", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action, leadId, ...extra }),
+    });
+    const j = await r.json();
+    if (j.assignments) setItems(j.assignments);
+  }, []);
 
   useEffect(() => {
-    const m = new URLSearchParams(window.location.search).get("agent");
-    if (m && POOL.some((p) => p.id === m)) setMe(m);
+    if (isAdmin) {
+      const m = new URLSearchParams(window.location.search).get("agent");
+      if (m && POOL.some((p) => p.id === m)) setMe(m);
+    }
     refresh();
     const poll = setInterval(refresh, 3000);
     const clock = setInterval(() => setTick((t) => t + 1), 1000);
@@ -43,43 +43,47 @@ export function PortalClient() {
       clearInterval(poll);
       clearInterval(clock);
     };
-  }, [refresh]);
+  }, [refresh, isAdmin]);
 
   const unclaimed = items.filter((a) => a.status === "UNCLAIMED");
   const myBasket = items.filter((a) => a.status === "ASSIGNED" && a.agentId === me);
   const myWorking = items.filter((a) => a.status === "CLAIMED" && a.agentId === me);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      {/* Assignment board (CEO / admin) */}
-      <div>
-        <h2 className="mb-3 text-2xl text-gold">Assignment board</h2>
-        <Card className="space-y-3">
-          {unclaimed.length === 0 && <p className="text-sm text-white/50">No unassigned leads in the queue.</p>}
-          {unclaimed.map((a) => (
-            <div key={a.leadId} className="rounded-lg border border-hairline bg-ink-900/40 p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium text-white">{a.name}</div>
-                  <div className="text-xs text-white/45">{a.country} · {a.budget} · {a.projectInterest}</div>
+    <div className={isAdmin ? "grid gap-6 lg:grid-cols-2" : ""}>
+      {isAdmin && (
+        <div>
+          <h2 className="mb-3 text-2xl text-gold">Assignment board</h2>
+          <Card className="space-y-3">
+            {unclaimed.length === 0 && <p className="text-sm text-white/50">No unassigned leads in the queue.</p>}
+            {unclaimed.map((a) => (
+              <div key={a.leadId} className="rounded-lg border border-hairline bg-ink-900/40 p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-white">{a.name}</div>
+                    <div className="text-xs text-white/45">{a.country} · {a.budget} · {a.projectInterest}</div>
+                  </div>
+                  <Badge variant="muted">Unassigned</Badge>
                 </div>
-                <Badge variant="muted">Unassigned</Badge>
+                <div className="mt-2 flex items-center gap-2">
+                  <AssignControl onAssign={(agentId) => act("assign", a.leadId, { agentId })} />
+                </div>
               </div>
-              <div className="mt-2 flex items-center gap-2">
-                <AssignControl onAssign={(agentId) => act("assign", a.leadId, { agentId })} />
-              </div>
-            </div>
-          ))}
-        </Card>
-      </div>
+            ))}
+          </Card>
+        </div>
+      )}
 
-      {/* Agent portal */}
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-2xl text-gold">Agent portal</h2>
-          <select value={me} onChange={(e) => setMe(e.target.value)} className="rounded-md border border-hairline bg-ink-100 px-2.5 py-1.5 text-sm text-white/80 focus:border-gold/50 focus:outline-none">
-            {POOL.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          <h2 className="text-2xl text-gold">{isAdmin ? "Agent portal" : "My basket"}</h2>
+          {isAdmin ? (
+            <select value={me} onChange={(e) => setMe(e.target.value)} className="rounded-md border border-hairline bg-ink-100 px-2.5 py-1.5 text-sm text-white/80 focus:border-gold/50 focus:outline-none">
+              {POOL.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          ) : (
+            <span className="text-sm text-white/50">{NAME.get(me) ?? me}</span>
+          )}
         </div>
 
         <Card className="space-y-3">
@@ -140,9 +144,5 @@ function Countdown({ expiresAt }: { expiresAt: number | null }) {
   const mm = Math.floor(remaining / 60000);
   const ss = Math.floor((remaining % 60000) / 1000);
   const danger = remaining < 2 * 60 * 1000;
-  return (
-    <span className={"tabular-nums text-sm font-semibold " + (danger ? "text-risk" : "text-gold")}>
-      {mm}:{String(ss).padStart(2, "0")}
-    </span>
-  );
+  return <span className={"tabular-nums text-sm font-semibold " + (danger ? "text-risk" : "text-gold")}>{mm}:{String(ss).padStart(2, "0")}</span>;
 }

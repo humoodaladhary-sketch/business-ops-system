@@ -113,6 +113,7 @@ export function getDemoAgents(): DemoAgentView[] {
 
 export interface CommissionRow {
   dealId: string;
+  agentId: string;
   agent: string;
   client: string;
   developer: string;
@@ -131,6 +132,7 @@ export function getDemoCommissions(): CommissionRow[] {
   return DEALS.filter((d) => d.period === DEMO_PERIOD && d.stage === "CLOSED_WON")
     .map((d) => ({
       dealId: d.id,
+      agentId: d.agentId,
       agent: NAME.get(d.agentId) ?? d.agentId,
       client: d.client,
       developer: d.developer,
