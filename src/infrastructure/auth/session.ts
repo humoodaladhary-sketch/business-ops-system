@@ -20,7 +20,19 @@ export interface Session {
 export const DEMO_COOKIE = "alwalaa_demo_session";
 
 export function isSupabaseConfigured(): boolean {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  // Supabase is OPT-IN: set AUTH_PROVIDER=supabase (with valid URL + anon key).
+  // Otherwise the app uses the secure demo login, so a stray/placeholder
+  // NEXT_PUBLIC_SUPABASE_URL can never 500 the app with "Invalid supabaseUrl".
+  if (process.env.AUTH_PROVIDER !== "supabase") return false;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return false;
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 export function supabaseServer() {
@@ -43,20 +55,7 @@ export function supabaseServer() {
   );
 }
 
-export async function getSession(): Promise<Session | null> {
-  if (isSupabaseConfigured()) {
-    const { data } = await supabaseServer().auth.getUser();
-    const user = data.user;
-    if (!user) return null;
-    const meta = (user.app_metadata ?? {}) as { role?: Role; agent_id?: string };
-    return {
-      userId: user.id,
-      email: user.email ?? "",
-      name: (user.user_metadata?.name as string) ?? user.email ?? "User",
-      role: meta.role ?? "AGENT",
-      agentId: meta.agent_id ?? null,
-    };
-  }
+function getDemoSession(): Session | null {
   const raw = cookies().get(DEMO_COOKIE)?.value;
   if (!raw) return null;
   try {
@@ -64,6 +63,28 @@ export async function getSession(): Promise<Session | null> {
   } catch {
     return null;
   }
+}
+
+export async function getSession(): Promise<Session | null> {
+  if (isSupabaseConfigured()) {
+    try {
+      const { data } = await supabaseServer().auth.getUser();
+      const user = data.user;
+      if (!user) return getDemoSession();
+      const meta = (user.app_metadata ?? {}) as { role?: Role; agent_id?: string };
+      return {
+        userId: user.id,
+        email: user.email ?? "",
+        name: (user.user_metadata?.name as string) ?? user.email ?? "User",
+        role: meta.role ?? "AGENT",
+        agentId: meta.agent_id ?? null,
+      };
+    } catch {
+      // Misconfigured Supabase — never 500 the whole app; use the demo cookie.
+      return getDemoSession();
+    }
+  }
+  return getDemoSession();
 }
 
 export async function requireSession(): Promise<Session> {
