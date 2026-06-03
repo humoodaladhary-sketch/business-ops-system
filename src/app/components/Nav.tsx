@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getSession } from "@/infrastructure/auth/session";
-import { signOut } from "../login/actions";
 
 const BASE = [
   { href: "/", label: "Overview" },
@@ -49,9 +48,7 @@ export async function Nav() {
                 {session.role === "ADMIN" ? "CEO / Admin" : "Advisor"}
               </span>
             </span>
-            <form action={signOut}>
-              <button className="rounded-md border border-hairline px-3 py-1.5 text-white/60 hover:border-gold/40 hover:text-gold">Sign out</button>
-            </form>
+            <a href="/api/auth/signout" className="rounded-md border border-hairline px-3 py-1.5 text-white/60 hover:border-gold/40 hover:text-gold">Sign out</a>
           </div>
         )}
       </div>

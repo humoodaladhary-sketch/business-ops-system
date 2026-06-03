@@ -1,6 +1,5 @@
 import Image from "next/image";
 import { AGENTS } from "../_data/dataset";
-import { signInDemo } from "./actions";
 import { isSupabaseConfigured } from "@/infrastructure/auth/session";
 import { SupabaseLogin } from "./SupabaseLogin";
 
@@ -22,27 +21,27 @@ export default function LoginPage() {
         {configured ? (
           <SupabaseLogin />
         ) : (
-          <form className="space-y-5">
+          <div className="space-y-5">
             <div>
               <div className="mb-2 text-xs uppercase tracking-wide text-white/40">Administration</div>
-              <button formAction={signInDemo} name="who" value="ceo" className="w-full rounded-md bg-gold px-4 py-2.5 font-medium text-ink hover:bg-gold-soft">
+              <a href="/api/auth/demo?who=ceo" className="block w-full rounded-md bg-gold px-4 py-2.5 text-center font-medium text-ink hover:bg-gold-soft">
                 Continue as CEO / Admin
-              </button>
+              </a>
             </div>
             <div>
               <div className="mb-2 text-xs uppercase tracking-wide text-white/40">Advisors</div>
               <div className="grid grid-cols-2 gap-2">
                 {agents.map((a) => (
-                  <button key={a.id} formAction={signInDemo} name="who" value={a.id} className="rounded-md border border-hairline bg-ink-900/40 px-3 py-2 text-sm text-white/80 hover:border-gold/40 hover:text-gold">
+                  <a key={a.id} href={`/api/auth/demo?who=${a.id}`} className="rounded-md border border-hairline bg-ink-900/40 px-3 py-2 text-center text-sm text-white/80 hover:border-gold/40 hover:text-gold">
                     {a.name}
-                  </button>
+                  </a>
                 ))}
               </div>
             </div>
             <p className="pt-1 text-center text-[11px] text-white/30">
               Preview sign-in. Production uses Supabase email auth + database row-level security.
             </p>
-          </form>
+          </div>
         )}
       </div>
     </div>
