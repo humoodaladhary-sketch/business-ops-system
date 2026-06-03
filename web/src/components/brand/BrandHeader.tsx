@@ -27,6 +27,7 @@ export function BrandHeader() {
           <Link href="/" className="btn-ghost">Dashboard</Link>
           <Link href="/upload" className="btn-ghost">Upload</Link>
           <Link href="/inventory" className="btn-ghost">Inventory</Link>
+          <Link href="/dev-inventory" className="btn-ghost">Dev Inventory</Link>
           <Link href="/reports" className="btn-ghost">Reports</Link>
         </nav>
       </div>

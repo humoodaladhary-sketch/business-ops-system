@@ -63,6 +63,41 @@ export async function runJson<T = unknown>(args: {
   return { data: extractFirstJson<T>(text), usage: resp.usage };
 }
 
+/**
+ * Raw-text variant. Returns the model's text output untouched so callers
+ * that expect a JSON *array* (or any non-object shape) can parse it
+ * themselves. Reuses the same client, model, and cached system prompt —
+ * this is NOT a second client.
+ */
+export async function runText(args: {
+  userPrompt: string;
+  maxTokens?: number;
+}): Promise<{ text: string; usage: Anthropic.Messages.Usage }> {
+  const resp = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: args.maxTokens ?? 16_000,
+    thinking: { type: "adaptive" },
+    system: systemBlocks,
+    messages: [{ role: "user", content: args.userPrompt }],
+  });
+
+  const text = resp.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("\n");
+
+  return { text, usage: resp.usage };
+}
+
+/** Strip markdown code fences from a model response, leaving raw JSON text. */
+export function stripCodeFences(text: string): string {
+  return text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+}
+
 export async function runVision<T = unknown>(args: {
   userPrompt: string;
   images: Array<{ base64: string; mediaType: "image/png" | "image/jpeg" | "image/webp" | "image/gif" }>;
