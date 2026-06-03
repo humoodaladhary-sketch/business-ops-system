@@ -106,6 +106,14 @@ enum IngestSource {
   FORM
 }
 
+// Lead-routing state for the 10-minute basket.
+enum AssignmentStatus {
+  UNCLAIMED
+  ASSIGNED
+  CLAIMED
+  REASSIGNED
+}
+
 // ---------------------------------------------------------------------------
 // People & inventory
 // ---------------------------------------------------------------------------
@@ -200,6 +208,10 @@ model Lead {
   registeredAt    DateTime?
   lastFollowUpAt  DateTime?
   stagingRowId    String?
+  // 10-minute basket routing (see /portal). claimExpiresAt = assignedAt + 10m.
+  assignmentStatus AssignmentStatus @default(UNCLAIMED)
+  assignedAt       DateTime?
+  claimExpiresAt   DateTime?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
@@ -208,6 +220,7 @@ model Lead {
   @@index([canonicalStage])
   @@index([assignedAgentId])
   @@index([source])
+  @@index([assignmentStatus])
 }
 
 model Deal {

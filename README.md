@@ -7,6 +7,23 @@ performance, deals, commissions, and **performance-based payouts**.
 > Built in phases from a real data audit. See [`docs/phase-0-data-audit.md`](docs/phase-0-data-audit.md)
 > for the field-by-field audit of the live agent sheets that drove this design.
 
+### Tailored for Alwalaa — what's wired
+
+- **Official logo** (white lockup + emblem, pulled from the brand Drive) in the nav + favicon.
+- **Real team data** consolidated from every agent's Drive sheet — Shatha, Alex, Pasha, Wesam
+  (+ Yousef head-of-sales override) deals, with developer rate, commission, **payment-voucher #**
+  and **dev-paid / agent-paid** status.
+- **Leads** page: all leads consolidated and organized — contact, **country code & country
+  auto-detected from the phone**, nationality, budget, source, normalized stage, assigned agent.
+- **Per-agent workspaces** (`/agents/[id]`): each advisor's leads, deals, KPIs and direct links
+  to their Drive folders to **view / edit / add / upload** sheets and documents.
+- **Agent Portal + 10-minute basket** (`/portal`): the CEO assigns leads; each lands in the
+  agent's basket with a **live 10-minute countdown** — Accept to claim, Pass to release, or it
+  **auto-routes to the next advisor**. Agents update lead progress here.
+- **Date-aware comp**: the **legacy** structure (25% advisor · 35% senior · 50% own/referral +
+  head-of-sales override) stays in force until **1 July 2026**, when the 25/35/40/50 performance
+  ladder takes over (previewable now).
+
 ---
 
 ## What it does

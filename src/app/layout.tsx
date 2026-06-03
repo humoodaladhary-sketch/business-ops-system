@@ -17,8 +17,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <Nav />
-        <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
-        <footer className="mx-auto max-w-7xl px-6 pb-10 pt-4 text-xs text-white/30">
+        <main className="mx-auto max-w-[1400px] px-6 py-8">{children}</main>
+        <footer className="mx-auto max-w-[1400px] px-6 pb-10 pt-4 text-xs text-white/30">
           Alwalaa Real Estate · Muscat, Oman — internal advisory operations system.
         </footer>
       </body>
