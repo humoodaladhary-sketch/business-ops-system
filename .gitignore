@@ -146,9 +146,10 @@ __pycache__/
 generated/
 
 # Next.js
-web/node_modules/
-web/.next/
-web/out/
-web/.vercel/
-web/.env.local
-web/.env*.local
+node_modules/
+.next/
+out/
+.vercel/
+.env.local
+.env*.local
+tsconfig.tsbuildinfo

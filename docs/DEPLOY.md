@@ -1,127 +1,116 @@
 # Deploy the Alwalaa AI Listing Agent
 
-Two services, both free tier, both beginner-friendly:
+Three services. All free tier. ~20 minutes the first time.
 
-1. **Supabase** — database, file storage, authentication (free: 500MB DB, 1GB storage).
-2. **Vercel** — hosts the Next.js app, auto-deploys from GitHub (free: generous).
+## What you'll do
 
-End state: a private URL like `alwalaa-listings.vercel.app` that only you and your invited team can access, backed by an Oman-scale database.
-
-Total setup time: **about 25 minutes** the first time.
-
----
-
-## Before you start
-
-You'll need:
-
-1. **GitHub account** with the repo `humoodaladhary-sketch/business-ops-system`.
-2. **Anthropic API key** — https://console.anthropic.com/settings/keys → Create Key → copy it (starts with `sk-ant-...`).
-3. **Supabase account** — https://supabase.com/dashboard → sign up with GitHub.
-4. **Vercel account** — https://vercel.com/signup → sign up with GitHub.
+1. Create a Supabase project (5 min)
+2. Run two SQL files in Supabase (3 min)
+3. Push the code (already done if you're reading this)
+4. Connect the GitHub repo to Vercel + paste 5 env vars (10 min)
+5. Smoke-test the live URL (2 min)
 
 ---
 
-## Step 1 — Create the Supabase project
+## Step 1 — Supabase project
 
-1. Go to https://supabase.com/dashboard → **New project**.
-2. Name it `alwalaa-listings`. Pick a strong DB password (save it!). Region: **Middle East (Bahrain)** is closest to Oman.
-3. Wait ~2 minutes for the project to provision.
-4. Once ready, click **SQL Editor** in the left nav.
-5. Open the file `docs/DATABASE_SCHEMA.sql` in this repo, copy the entire contents, paste into the SQL editor, click **Run**. You should see "Success. No rows returned."
-6. Left nav → **Storage** → **New bucket** → name it `alwalaa` → **private** (not public) → Create.
-7. Left nav → **Settings → API**. Copy these three values into a notepad (you'll paste them into Vercel in step 3):
-   - Project URL (looks like `https://xxxxx.supabase.co`)
-   - `anon` public key (long JWT)
-   - `service_role` key (long JWT — **keep this secret**)
+1. Open **https://supabase.com/dashboard** → sign in with GitHub.
+2. Click the green **New project** button.
+3. Fill in:
+   - **Name:** `alwalaa-listings`
+   - **Database password:** click **Generate a password**, then **Copy**, then paste somewhere safe.
+   - **Region:** **Middle East (Bahrain)** — closest to Oman.
+4. Click **Create new project**. Wait ~2 minutes for the spinner.
 
 ---
 
-## Step 2 — Push the code (already done if you're reading this on the branch)
+## Step 2 — Run the SQL
 
-The code is on branch `claude/ai-property-listing-agent-vD3E7`. You can deploy from that branch directly, or merge into `main` first:
-
-- Go to https://github.com/humoodaladhary-sketch/business-ops-system/pulls
-- New PR: base `main`, compare `claude/ai-property-listing-agent-vD3E7` → Create → Merge.
+1. In Supabase, on the **left sidebar**, click the **SQL Editor** icon (looks like `>_`).
+2. Click **+ New query** at the top.
+3. Open this URL in a **new tab**:
+   `https://raw.githubusercontent.com/humoodaladhary-sketch/business-ops-system/claude/ai-property-listing-agent-vD3E7/docs/DATABASE_SCHEMA.sql`
+4. **Ctrl+A** to select all, **Ctrl+C** to copy.
+5. Back in Supabase, **paste** into the SQL editor → click the green **Run** button (bottom right).
+6. You should see **Success. No rows returned.**
+7. Repeat steps 2–6 for the second file:
+   `https://raw.githubusercontent.com/humoodaladhary-sketch/business-ops-system/claude/ai-property-listing-agent-vD3E7/docs/DEV_INVENTORY_SCHEMA.sql`
 
 ---
 
-## Step 3 — Deploy to Vercel
+## Step 3 — Collect 3 Supabase keys
 
-1. Go to https://vercel.com/new.
-2. Click **Import Git Repository** → find `humoodaladhary-sketch/business-ops-system`.
-3. You'll see a **Configure Project** screen. Very important:
-   - **Root Directory** → click **Edit** → choose **`web`** (the Next.js app lives there).
-   - **Framework preset** should auto-fill to **Next.js**.
-4. Click **Environment Variables** (expandable). Add these 5:
+1. In Supabase, **left sidebar → ⚙ Settings → API**.
+2. Copy these **3 values** into a notepad:
+
+| Label on Supabase page | Save as |
+|---|---|
+| **Project URL** | `SUPABASE_URL` |
+| **anon public** key | `SUPABASE_ANON_KEY` |
+| **service_role** key (click "Reveal") | `SUPABASE_SERVICE_KEY` |
+
+⚠️ Never share the `service_role` key.
+
+---
+
+## Step 4 — Anthropic key
+
+1. Open **https://console.anthropic.com/settings/keys**.
+2. **Create Key** → name it `alwalaa` → **Copy**.
+3. Open **https://console.anthropic.com/settings/billing** → **Add credits** → **$10**.
+
+---
+
+## Step 5 — Deploy to Vercel
+
+1. Open **https://vercel.com/new**.
+2. Sign in with **GitHub** if needed.
+3. Find **`business-ops-system`** in your repo list → click **Import**.
+4. **You don't need to touch anything in the configure screen** — Vercel auto-detects Next.js because the app is at the repo root.
+5. Scroll down to **Environment Variables**. Add these **5 rows**:
 
    | Name | Value |
    |---|---|
-   | `ANTHROPIC_API_KEY` | `sk-ant-...` (your Anthropic key) |
-   | `NEXT_PUBLIC_SUPABASE_URL` | your Supabase project URL |
-   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the `anon` public key |
-   | `SUPABASE_SERVICE_ROLE_KEY` | the `service_role` key |
-   | `NEXT_PUBLIC_ALWALAA_WHATSAPP` | e.g. `+968 xxxx xxxx` |
+   | `ANTHROPIC_API_KEY` | your `sk-ant-...` from Step 4 |
+   | `NEXT_PUBLIC_SUPABASE_URL` | your Project URL from Step 3 |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | your `anon` key from Step 3 |
+   | `SUPABASE_SERVICE_ROLE_KEY` | your `service_role` key from Step 3 |
+   | `NEXT_PUBLIC_ALWALAA_WHATSAPP` | `+968 0000 0000` (your real number later) |
 
-5. Click **Deploy**. Wait 2–4 minutes.
-6. When build finishes you land on the app's Vercel page. The URL at the top (e.g. `https://alwalaa-listings.vercel.app`) is **your public link**.
-
----
-
-## Step 4 — Add the logo
-
-1. On your laptop, drop the Alwalaa logo PNG into `web/public/brand/alwalaa-logo.png`.
-2. Commit and push to the same branch.
-3. Vercel auto-redeploys in ~60 seconds.
-
-(Until you do this, the header shows a tasteful `W و` placeholder.)
+6. Click the **Branch** dropdown — pick **`claude/ai-property-listing-agent-vD3E7`** (or `main` if you've merged).
+7. Click the big black **Deploy**.
+8. Wait 3–5 minutes for the build. When you see **🎉 Congratulations**, click **Continue to Dashboard**.
 
 ---
 
-## Step 5 — First smoke test
+## Step 6 — Test it
 
-1. Open your new URL in a browser.
-2. Click **Upload** in the top nav.
-3. Fill in a project name (e.g. `Sultan Haitham City — Phase 1`).
-4. Drop in one Excel inventory + one brochure PDF.
-5. Click **⚙ Extract units**.
-6. You should see a JSON dump below in 30–90 seconds with the extracted units and project data.
+1. On the Vercel project page, click **Visit** (top right) — or copy the URL like `https://business-ops-system-xxx.vercel.app`.
+2. Click **Dev Inventory** in the top nav.
+3. Paste any sample inventory text into the **Ingest** box. Try this:
 
-If that works, the whole system is wired end-to-end. Next milestones persist the output to Supabase and give you the listing UI.
+   ```
+   AIDA - Building B:
+   B-1204, 2BR apartment, 96 sqm, floor 12, partial sea view, OMR 108,500
+   B-1205, 2BR apartment, 96 sqm, floor 12, partial sea view, OMR 112,000
+   B-2101, 3BR penthouse, 220 sqm, top floor, sea view, OMR 425,000
+   ```
+4. Click **Normalize** → wait 20 seconds → see the preview diff → click **Confirm & commit**.
+5. Switch to **Dashboard** tab → you should see KPI cards, price bands, and lowest-vs-highest comparisons.
+6. Switch to **Generate** tab → pick a unit, EN or AR, click **Generate listing**.
 
----
-
-## Troubleshooting
-
-**"Extraction failed: Missing Supabase env vars"**
-You forgot one of the env vars in step 3.4. Vercel → your project → **Settings → Environment Variables** → add the missing one → **Redeploy**.
-
-**"Extraction failed: 401 from Anthropic"**
-Your Anthropic key is invalid, expired, or the account has no billing credit. Go to https://console.anthropic.com/settings/billing and add $5–10.
-
-**"Build failed: pdf-parse not found"**
-Should not happen with the current package.json — if it does, in Vercel Settings → General → Node.js Version → set to **20.x** and redeploy.
-
-**"I see the page but the Upload button does nothing"**
-Open the browser's developer console (F12 → Console tab) — most issues surface there. Paste the error into the chat and I'll help.
-
-**I want a custom domain**
-Vercel → project → **Settings → Domains** → add `app.alwalaa.om` → follow DNS instructions.
-
-**I want to restrict access to just my team**
-Supabase Auth + Vercel middleware — planned for Milestone M5 in the build plan.
+If you see brand-aligned copy, the entire pipeline is live. 🎉
 
 ---
 
-## Running it locally (optional)
+## If a step fails
 
-If you'd rather develop on your laptop:
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Vercel build fails immediately | Missing env var | Vercel → Settings → Environment Variables → check all 5 are present → **Redeploy** |
+| Build fails with "module not found" | Stale dependency cache | Vercel → Deployments → latest → ⋯ → **Redeploy without cache** |
+| App loads but `/api/extract` 500s | Supabase schema not applied | Re-run both SQL files in Supabase SQL Editor |
+| "Add an Anthropic API key" everywhere | `ANTHROPIC_API_KEY` missing or wrong | Verify in Vercel env vars, redeploy |
+| 401 from Anthropic | Out of credit | Anthropic console → Billing → Add credits |
 
-```bash
-cd web
-npm install
-cp .env.example .env.local   # fill in the 5 env vars from step 3
-npm run dev
-```
-
-Open http://localhost:3000.
+If you hit something not listed, paste the **last ~30 lines of the build log** (Vercel → Deployments → click failed deploy → expand logs) into the chat and I'll diagnose it.
