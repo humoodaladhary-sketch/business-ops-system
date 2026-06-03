@@ -191,23 +191,17 @@ hardcode any agent's vocabulary.
 
 ---
 
-## 9. Decisions required before Phase 1 (schema)
+## 9. Decisions — RESOLVED (2026-06-03, CEO)
 
-These are surfaced to the CEO/admin and tracked in the PR. The schema waits on them.
+| # | Decision | Outcome | Schema / engine implication |
+| :-- | :-- | :-- | :-- |
+| 1 | Commission split basis | **Hybrid: performance ladder + lead-source floor** | Engine computes the 25/35/40/50 ladder rate from % of monthly target, then applies a **source floor**: own/referral leads never fall below their floor (**default 50% — to confirm**); Alwalaa-sourced leads are ladder-only. `agentSplitRate = max(ladderRate, sourceFloor(leadSource))`. Needs a `LeadSourceFloor` config table so floors stay config, not code. |
+| 2 | Co-brokered deals | **Support multi-agent splits** | `Deal` ↔ `Agent` is **many-to-many** via a `DealAttribution` join (agent, sharePct, role). Sales volume toward target **and** payout divide by share. Commission rows are per-attribution. |
+| 3 | Month-attribution date | **`Deal Closed On` drives the month** | The month a deal counts in = `Deal.closeDate` (not `reservationDate`). `reservationDate` is still stored (optional, for funnel analytics) but does **not** drive commission month. Overrides the brief on this point, per CEO. |
+| 4 | Developer rate model | **Tier-ready schema, seeded flat** | `DeveloperCommissionRule` supports quarterly-volume tiers (threshold → rate), but is **seeded with today's flat rates**: Ahly Sabbour 3.5%, Sarooj 4%, Muriya 3%, Al Abrar 3%, Adante 3%. |
 
-1. **Commission split basis.** The sheets currently set the agent split by **lead source**
-   (Own/Referral ≈ 50%, Alwalaa ≈ 25–35%). The brief's new model sets it purely by
-   **% of monthly target** (25/35/40/50 ladder), with lead source as analytics-only.
-   These produce different paychecks. Confirm we are switching to the performance ladder.
-2. **Co-brokered deals.** Support multiple agents per deal with split attribution, or one
-   agent per deal? (Evidence says splits happen.)
-3. **Reservation vs Closed-Won + month-attribution date.** What event = `Reservation`
-   (token/booking fee paid?) vs `Closed-Won` (SPA signed?), and which date drives the
-   commission month? The brief says `reservationDate`; the sheets only reliably capture
-   `Deal Closed On`.
-4. **Developer rate model.** Seed flat per-developer rates (as the sheets show: 3 / 3.5 / 4%)
-   or the brief's quarterly-volume tiering? (Recommend: tier-ready schema, seeded with the
-   flat rates we have.)
+**One open parameter:** the source-floor value for own/referral leads (Decision 1).
+Default assumed = **50%** (matches what the sheets show). To be confirmed at the Phase 1 review.
 
 ---
 
