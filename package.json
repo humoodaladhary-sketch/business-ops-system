@@ -5,6 +5,7 @@
   "description": "Alwalaa Real Estate — internal investment-advisory CRM (leads, performance, commissions, payouts).",
   "scripts": {
     "dev": "next dev",
+    "postinstall": "prisma generate",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",

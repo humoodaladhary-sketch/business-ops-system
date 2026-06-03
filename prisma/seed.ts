@@ -141,13 +141,15 @@ async function main() {
     }
   }
 
-  // Stage mappings (global)
+  // Stage mappings (global). agentId is null here; Postgres treats NULLs as
+  // distinct in the compound unique, so find-then-write to stay idempotent.
   for (const [sourceLabel, stage] of STAGE_MAP) {
-    await prisma.stageMapping.upsert({
-      where: { sourceLabel_agentId: { sourceLabel, agentId: null as any } },
-      update: { canonicalStage: stage as any },
-      create: { sourceLabel, canonicalStage: stage as any },
-    });
+    const existing = await prisma.stageMapping.findFirst({ where: { sourceLabel, agentId: null } });
+    if (existing) {
+      await prisma.stageMapping.update({ where: { id: existing.id }, data: { canonicalStage: stage as any } });
+    } else {
+      await prisma.stageMapping.create({ data: { sourceLabel, canonicalStage: stage as any } });
+    }
   }
 
   console.log("Seed complete: ladder, floors, developers, projects, agents, targets, stage maps.");
