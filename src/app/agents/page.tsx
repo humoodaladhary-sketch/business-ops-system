@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AGENTS, DEALS, LEADS } from "../_data/dataset";
-import { Card } from "../components/ui";
+import { Card, Badge } from "../components/ui";
 import { formatOMR } from "../lib/format";
 
 export const metadata = { title: "Agents · Alwalaa CRM" };
@@ -31,10 +31,14 @@ export default function AgentsPage() {
           const leads = LEADS.filter((l) => l.agentId === a.id).length;
           return (
             <Link key={a.id} href={`/agents/${a.id}`}>
-              <Card className="h-full transition hover:border-gold/40">
+              <Card className={"h-full transition hover:border-gold/40" + (a.status === "FORMER" ? " opacity-60" : "")}>
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl text-white">{a.name}</h3>
-                  <span className="text-xs uppercase tracking-wide text-gold/70">{ROLE_LABEL[a.role] ?? a.role}</span>
+                  {a.status === "FORMER" ? (
+                    <Badge variant="muted">Former · records</Badge>
+                  ) : (
+                    <span className="text-xs uppercase tracking-wide text-gold/70">{ROLE_LABEL[a.role] ?? a.role}</span>
+                  )}
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                   <Stat n={leads} l="Leads" />

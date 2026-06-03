@@ -4,6 +4,7 @@ import { AGENTS, getAgent, dealsForAgent, leadsForAgent } from "../../_data/data
 import { phoneMeta } from "../../lib/phone";
 import { Card, SectionTitle, StatTile, Badge } from "../../components/ui";
 import { formatOMR, formatRate } from "../../lib/format";
+import { agentStats, bucketize, dealsFor } from "../../_data/analytics";
 import { STAGE_LABELS, type CanonicalStage } from "@/domain";
 
 export function generateStaticParams() {
@@ -16,8 +17,9 @@ export default function AgentWorkspace({ params }: { params: { id: string } }) {
 
   const deals = dealsForAgent(agent.id);
   const leads = leadsForAgent(agent.id);
-  const volume = deals.reduce((s, d) => s + d.value, 0);
-  const payout = deals.reduce((s, d) => s + d.payout, 0);
+  const stats = agentStats(agent.id);
+  const months = bucketize(dealsFor(agent.id), "month");
+  const volume = stats.volume;
   const pct = agent.target ? volume / agent.target : 0;
 
   return (
@@ -26,20 +28,42 @@ export default function AgentWorkspace({ params }: { params: { id: string } }) {
         <div>
           <Link href="/agents" className="text-sm text-white/40 hover:text-gold">← Agents</Link>
           <h1 className="text-4xl text-white">{agent.name}</h1>
-          <p className="mt-1 text-white/50">{agent.role.replace(/_/g, " ")} · {agent.segment}</p>
+          <p className="mt-1 text-white/50">
+            {agent.role.replace(/_/g, " ")} · {agent.segment}
+            {agent.status === "FORMER" && <span className="ml-2 text-amber-300">· Former employee (records only)</span>}
+          </p>
         </div>
         <Link href={`/portal?agent=${agent.id}`} className="rounded-md border border-gold/40 bg-gold/10 px-4 py-2 text-sm text-gold hover:bg-gold/20">
           Open agent portal →
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
         <StatTile label="Leads" value={leads.length} />
-        <StatTile label="Deals" value={deals.length} />
+        <StatTile label="Deals closed" value={stats.deals} hint={stats.reservations ? `+${stats.reservations} reserved` : `since ${stats.firstClose ?? "—"}`} />
         <StatTile label="Volume" value={formatOMR(volume, true)} accent />
-        <StatTile label="Payout (legacy)" value={formatOMR(payout, true)} />
+        <StatTile label="Earned" value={formatOMR(stats.earned, true)} hint="paid to agent" />
+        <StatTile label="Pending" value={formatOMR(stats.pendingAgent, true)} hint="to be paid" />
         <StatTile label="vs target" value={agent.target ? Math.round(pct * 100) + "%" : "—"} hint={agent.target ? formatOMR(agent.target, true) : "no target"} />
       </div>
+
+      {months.length > 0 && (
+        <div>
+          <SectionTitle sub="Closings and commission per month.">Monthly breakdown</SectionTitle>
+          <Card className="space-y-2">
+            {months.map((m) => (
+              <div key={m.key} className="flex items-center justify-between border-b border-white/5 pb-2 text-sm last:border-0 last:pb-0">
+                <span className="text-white/70">{m.label}</span>
+                <span className="flex gap-6 tabular-nums">
+                  <span className="text-white/60">{m.deals} {m.deals === 1 ? "deal" : "deals"}</span>
+                  <span className="w-28 text-right text-white/80">{formatOMR(m.volume, true)}</span>
+                  <span className="w-28 text-right text-gold">{formatOMR(m.commission)}</span>
+                </span>
+              </div>
+            ))}
+          </Card>
+        </div>
+      )}
 
       {/* Document folders — view / edit / add / upload directly in Drive */}
       <div>

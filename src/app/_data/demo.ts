@@ -102,8 +102,10 @@ function buildAgent(agentId: string, period: string): DemoAgentView {
   };
 }
 
-// Agents that carry a sales target appear on the performance views.
-const SCORING = AGENTS.filter((a) => ["SENIOR", "ADVISOR", "NEW", "HEAD_OF_SALES"].includes(a.role));
+// Active sales agents appear on the performance views (former staff excluded).
+const SCORING = AGENTS.filter(
+  (a) => ["SENIOR", "ADVISOR", "NEW"].includes(a.role) && a.status !== "FORMER",
+);
 
 export function getDemoAgents(): DemoAgentView[] {
   return SCORING.map((a) => buildAgent(a.id, DEMO_PERIOD));

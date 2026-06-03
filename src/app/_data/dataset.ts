@@ -27,6 +27,7 @@ export interface AgentRecord {
   vouchers?: string;
   rampEndDate?: string;
   exempt?: boolean;
+  status?: "ACTIVE" | "FORMER"; // FORMER = kept for records/insight only
 }
 
 export interface DealRecord {
@@ -77,7 +78,7 @@ export interface LeadRecord {
 
 export const AGENTS: AgentRecord[] = [
   { id: "shatha", name: "Shatha Al Manthari", role: "SENIOR", segment: "DIASPORA", target: 350000, driveFolder: DRIVE("1-r9HPvaiH-LDbd3Rv6m_Sp_PiPDvaTJB"), closedDocs: DRIVE("1vUhUiZygkAGtVwN_-10QP_tlOJs-Cey2"), vouchers: DRIVE("1g7OSUcaOoq3SiOt2NuvRO05TD0Gy5fkN") },
-  { id: "yousef", name: "Yousef", role: "HEAD_OF_SALES", segment: "NA", target: 300000, driveFolder: DRIVE("10Fr22TuuAXL6kj3Wa3vYPj_hA3dtVqXr"), closedDocs: DRIVE("1qvuv5qbiRMZBXM_A_H3g4Pszo4kGenwN"), vouchers: DRIVE("1J8ZM4_zrGDviuZdvD_2gubTmFOQnRlwZ") },
+  { id: "yousef", name: "Yousef", role: "HEAD_OF_SALES", segment: "NA", target: 0, status: "FORMER", driveFolder: DRIVE("10Fr22TuuAXL6kj3Wa3vYPj_hA3dtVqXr"), closedDocs: DRIVE("1qvuv5qbiRMZBXM_A_H3g4Pszo4kGenwN"), vouchers: DRIVE("1J8ZM4_zrGDviuZdvD_2gubTmFOQnRlwZ") },
   { id: "alex", name: "Alex Showran", role: "ADVISOR", segment: "RESIDENT", target: 250000, driveFolder: DRIVE("1BJMCIFLLcqqhv4IpaJxovcgiGHeIBlJU"), closedDocs: DRIVE("1-XxmHUPyhzEGY5yfJ7t93H7-85NEkH_6"), vouchers: DRIVE("1MoLzIKfHdJ54E-qyyxwKaGWoAsvzOuit") },
   { id: "pasha", name: "Pasha", role: "ADVISOR", segment: "RESIDENT", target: 250000, driveFolder: DRIVE("1zBD-0lDQxZgwt0m74aNOgk16A8AyA6S9"), closedDocs: DRIVE("1GlZNvJ15TVhicjlQAzSlueVzHoFxFo1a"), vouchers: DRIVE("1_RXKortsifhp3GJRB5TCZMxD7mSjJMNJ") },
   { id: "wesam", name: "Wesam Zeno", role: "ADVISOR", segment: "RESIDENT", target: 250000, driveFolder: DRIVE("18jh5WBpXifLf-5bxPdqRZQxHQW5FCDoB"), closedDocs: DRIVE("1Hort5_HjU6jrhUkWMS7qvE6dvBsyPaqj"), vouchers: DRIVE("14j4h7-9EU0Akbr9FGluwi377kmKEGv26") },

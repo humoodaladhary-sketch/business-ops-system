@@ -20,6 +20,10 @@ performance, deals, commissions, and **performance-based payouts**.
 - **Agent Portal + 10-minute basket** (`/portal`): the CEO assigns leads; each lands in the
   agent's basket with a **live 10-minute countdown** — Accept to claim, Pass to release, or it
   **auto-routes to the next advisor**. Agents update lead progress here.
+- **Agent analytics** (`/analytics`): deals & commission **since each agent started**, by
+  **month / week / day**, **earned vs. to-be-received** (reconciled with finance payment status),
+  and a sortable **ranking**. Former staff (e.g. Yousef) are kept for records but excluded from
+  active rankings/routing.
 - **Date-aware comp**: the **legacy** structure (25% advisor · 35% senior · 50% own/referral +
   head-of-sales override) stays in force until **1 July 2026**, when the 25/35/40/50 performance
   ladder takes over (previewable now).
