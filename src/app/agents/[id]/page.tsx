@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getAgent, dealsForAgent, leadsForAgent } from "../../_data/dataset";
+import { loadData } from "../../_data/source";
 import { requireSession, canViewAgent } from "@/infrastructure/auth/session";
 import { phoneMeta } from "../../lib/phone";
 import { Card, SectionTitle, StatTile, Badge } from "../../components/ui";
@@ -10,14 +10,15 @@ import { STAGE_LABELS, type CanonicalStage } from "@/domain";
 
 export default async function AgentWorkspace({ params }: { params: { id: string } }) {
   const session = await requireSession();
-  const agent = getAgent(params.id);
+  const data = await loadData();
+  const agent = data.agents.find((a) => a.id === params.id);
   if (!agent) notFound();
   if (!canViewAgent(session, agent.id)) redirect(session.agentId ? `/agents/${session.agentId}` : "/");
 
-  const deals = dealsForAgent(agent.id);
-  const leads = leadsForAgent(agent.id);
-  const stats = agentStats(agent.id);
-  const months = bucketize(dealsFor(agent.id), "month");
+  const deals = data.deals.filter((d) => d.agentId === agent.id);
+  const leads = data.leads.filter((l) => l.agentId === agent.id);
+  const stats = agentStats(data, agent.id);
+  const months = bucketize(dealsFor(data, agent.id), "month");
   const volume = stats.volume;
   const pct = agent.target ? volume / agent.target : 0;
 

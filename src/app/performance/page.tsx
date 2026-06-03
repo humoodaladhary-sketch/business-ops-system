@@ -1,10 +1,11 @@
 import { getDemoAgents, DEMO_PERIOD } from "../_data/demo";
+import { loadData } from "../_data/source";
 import { SectionTitle, Card } from "../components/ui";
 import { TierProgress } from "../components/TierProgress";
 import { PerformanceChart, type PerfDatum } from "../components/PerformanceChart";
 
-export default function PerformancePage() {
-  const agents = getDemoAgents().filter((a) => a.result.targetAmount > 0);
+export default async function PerformancePage() {
+  const agents = getDemoAgents(await loadData()).filter((a) => a.result.targetAmount > 0);
 
   const chartData: PerfDatum[] = agents.map((a) => ({
     name: a.name.split(" ")[0],

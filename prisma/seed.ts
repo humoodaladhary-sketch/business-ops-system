@@ -35,22 +35,23 @@ const PROJECTS = [
 // --- Agents (roster + targets). Sheet-only names flagged role-to-confirm. ----
 const NOW = new Date();
 const RAMP_END = new Date(NOW.getTime() + 90 * 24 * 3600 * 1000);
+// Stable ids align seed, the Sheets sync writer, and the UI data layer.
 const AGENTS = [
-  { name: "Shatha Al Manthari", role: "SENIOR", segment: "DIASPORA", target: 350000 },
-  { name: "Alex Showran", role: "ADVISOR", segment: "RESIDENT", target: 250000 },
-  { name: "Pasha", role: "ADVISOR", segment: "RESIDENT", target: 250000 },
-  { name: "Wesam Zeno", role: "ADVISOR", segment: "RESIDENT", target: 250000 },
-  { name: "Khalid", role: "NEW", segment: "RESIDENT", target: 120000, rampEndDate: RAMP_END },
-  { name: "Tariq", role: "TRAINEE", segment: "NA", target: null, exempt: true },
-  { name: "Abeer Al Wardi", role: "MARKETING", segment: "NA", target: null },
-  { name: "Ishaq", role: "FINANCE", segment: "NA", target: null },
-  { name: "Chris", role: "LISTINGS", segment: "NA", target: null },
-  { name: "Humood Al Adhary", role: "CEO", segment: "NA", target: null },
-  // Found in the live sheets — role/segment to confirm with the CEO.
-  { name: "Yousef", role: "ADVISOR", segment: "NA", target: 250000 },
-  { name: "Safaa", role: "ADVISOR", segment: "NA", target: 250000 },
-  { name: "Sulaiman", role: "FINANCE", segment: "NA", target: null },
-  { name: "Menessa", role: "ADVISOR", segment: "NA", target: 250000 },
+  { id: "shatha", name: "Shatha Al Manthari", role: "SENIOR", segment: "DIASPORA", target: 350000 },
+  { id: "alex", name: "Alex Showran", role: "ADVISOR", segment: "RESIDENT", target: 250000 },
+  { id: "pasha", name: "Pasha", role: "ADVISOR", segment: "RESIDENT", target: 250000 },
+  { id: "wesam", name: "Wesam Zeno", role: "ADVISOR", segment: "RESIDENT", target: 250000 },
+  { id: "khalid", name: "Khalid", role: "NEW", segment: "RESIDENT", target: 120000, rampEndDate: RAMP_END },
+  { id: "tariq", name: "Tariq", role: "TRAINEE", segment: "NA", target: null, exempt: true },
+  { id: "abeer", name: "Abeer Al Wardi", role: "MARKETING", segment: "NA", target: null },
+  { id: "ishaq", name: "Ishaq", role: "FINANCE", segment: "NA", target: null },
+  { id: "chris", name: "Chris", role: "LISTINGS", segment: "NA", target: null },
+  { id: "humood", name: "Humood Al Adhary", role: "CEO", segment: "NA", target: null },
+  // Former employee — kept for records only.
+  { id: "yousef", name: "Yousef", role: "ADVISOR", segment: "NA", target: null, inactive: true },
+  { id: "safaa", name: "Safaa", role: "ADVISOR", segment: "NA", target: 250000 },
+  { id: "sulaiman", name: "Sulaiman", role: "FINANCE", segment: "NA", target: null },
+  { id: "menessa", name: "Menessa", role: "ADVISOR", segment: "NA", target: 250000 },
 ] as const;
 
 const PERIODS = ["2026-03", "2026-04", "2026-05", "2026-06"];
@@ -117,15 +118,17 @@ async function main() {
 
   // Agents + targets
   for (const a of AGENTS) {
+    const status = "inactive" in a && a.inactive ? "INACTIVE" : a.role === "TRAINEE" ? "PROBATION" : "ACTIVE";
     const agent = await prisma.agent.upsert({
-      where: { email: emailFor(a.name) },
-      update: { name: a.name, role: a.role as any, segment: a.segment as any },
+      where: { id: a.id },
+      update: { name: a.name, role: a.role as any, segment: a.segment as any, status },
       create: {
+        id: a.id,
         name: a.name,
         email: emailFor(a.name),
         role: a.role as any,
         segment: a.segment as any,
-        status: a.role === "TRAINEE" ? "PROBATION" : "ACTIVE",
+        status,
         exemptFromAtRisk: "exempt" in a ? Boolean(a.exempt) : false,
         rampEndDate: "rampEndDate" in a ? a.rampEndDate : null,
       },

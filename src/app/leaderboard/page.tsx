@@ -1,11 +1,12 @@
 import { computeAgentOfMonth, computeOverachievers, type AgentMonth } from "@/domain";
 import { getDemoAgents, DEMO_PERIOD } from "../_data/demo";
+import { loadData } from "../_data/source";
 import { Leaderboard, type LeaderRow } from "../components/Leaderboard";
 import { SectionTitle, Card, Badge } from "../components/ui";
 import { formatOMR } from "../lib/format";
 
-export default function LeaderboardPage() {
-  const agents = getDemoAgents();
+export default async function LeaderboardPage() {
+  const agents = getDemoAgents(await loadData());
 
   const rows: LeaderRow[] = agents
     .map((a) => ({

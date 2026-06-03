@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AGENTS, DEALS, LEADS } from "../_data/dataset";
 import { Card, Badge } from "../components/ui";
 import { formatOMR } from "../lib/format";
 import { requireSession } from "@/infrastructure/auth/session";
+import { loadData } from "../_data/source";
 
 export const metadata = { title: "Agents · Alwalaa CRM" };
 
@@ -21,6 +21,7 @@ const ROLE_LABEL: Record<string, string> = {
 export default async function AgentsPage() {
   const session = await requireSession();
   if (session.role !== "ADMIN") redirect(session.agentId ? `/agents/${session.agentId}` : "/");
+  const data = await loadData();
   return (
     <div className="space-y-7">
       <div>
@@ -29,10 +30,10 @@ export default async function AgentsPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {AGENTS.map((a) => {
-          const deals = DEALS.filter((d) => d.agentId === a.id);
+        {data.agents.map((a) => {
+          const deals = data.deals.filter((d) => d.agentId === a.id);
           const volume = deals.reduce((s, d) => s + d.value, 0);
-          const leads = LEADS.filter((l) => l.agentId === a.id).length;
+          const leads = data.leads.filter((l) => l.agentId === a.id).length;
           return (
             <Link key={a.id} href={`/agents/${a.id}`}>
               <Card className={"h-full transition hover:border-gold/40" + (a.status === "FORMER" ? " opacity-60" : "")}>

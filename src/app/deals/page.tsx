@@ -1,4 +1,5 @@
-import { DEALS, COMP_NEW_EFFECTIVE } from "../_data/dataset";
+import { COMP_NEW_EFFECTIVE } from "../_data/dataset";
+import { loadData } from "../_data/source";
 import { StatTile, Card } from "../components/ui";
 import { formatOMR } from "../lib/format";
 import { DealsTable } from "./DealsTable";
@@ -9,7 +10,8 @@ export const metadata = { title: "Deals · Alwalaa CRM" };
 export default async function DealsPage() {
   const session = await requireSession();
   const admin = isAdmin(session);
-  const deals = admin ? DEALS : DEALS.filter((d) => d.agentId === session.agentId);
+  const allDeals = (await loadData()).deals;
+  const deals = admin ? allDeals : allDeals.filter((d) => d.agentId === session.agentId);
 
   const won = deals.filter((d) => d.stage === "CLOSED_WON");
   const totalVolume = deals.reduce((s, d) => s + d.value, 0);

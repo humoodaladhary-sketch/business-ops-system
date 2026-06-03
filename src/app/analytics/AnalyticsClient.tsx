@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AGENTS } from "../_data/dataset";
 import { ranking, bucketize, dealsFor, type Metric, type Grain } from "../_data/analytics";
-import { Card, SectionTitle, Badge } from "../components/ui";
+import type { DataBundle } from "../_data/source";
+import { Card, SectionTitle } from "../components/ui";
 import { formatOMR } from "../lib/format";
 
 const METRICS: [Metric, string][] = [
@@ -19,16 +19,16 @@ const GRAINS: [Grain, string][] = [
   ["day", "Per day"],
 ];
 const MEDALS = ["🥇", "🥈", "🥉"];
-const SALES = AGENTS.filter((a) => ["SENIOR", "ADVISOR", "NEW"].includes(a.role) && a.status !== "FORMER");
 
-export function AnalyticsClient({ isAdmin = true, meAgentId = null }: { isAdmin?: boolean; meAgentId?: string | null }) {
+export function AnalyticsClient({ data, isAdmin = true, meAgentId = null }: { data: DataBundle; isAdmin?: boolean; meAgentId?: string | null }) {
   const [metric, setMetric] = useState<Metric>("volume");
   const [agent, setAgent] = useState<string>(isAdmin ? "ALL" : meAgentId ?? "ALL");
   const [grain, setGrain] = useState<Grain>("month");
-  const meName = AGENTS.find((a) => a.id === meAgentId)?.name ?? "Me";
 
-  const ranked = useMemo(() => ranking(metric), [metric]);
-  const buckets = useMemo(() => bucketize(dealsFor(agent as "ALL"), grain), [agent, grain]);
+  const sales = useMemo(() => data.agents.filter((a) => ["SENIOR", "ADVISOR", "NEW"].includes(a.role) && a.status !== "FORMER"), [data]);
+  const meName = data.agents.find((a) => a.id === meAgentId)?.name ?? "Me";
+  const ranked = useMemo(() => ranking(data, metric), [data, metric]);
+  const buckets = useMemo(() => bucketize(dealsFor(data, agent as "ALL"), grain), [data, agent, grain]);
   const maxVol = Math.max(1, ...buckets.map((b) => b.volume));
 
   return (
@@ -81,7 +81,7 @@ export function AnalyticsClient({ isAdmin = true, meAgentId = null }: { isAdmin?
             {isAdmin ? (
               <select value={agent} onChange={(e) => setAgent(e.target.value)} className="rounded-md border border-hairline bg-ink-100 px-2.5 py-2 text-sm text-white/80 focus:border-gold/50 focus:outline-none">
                 <option value="ALL">Whole team</option>
-                {SALES.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                {sales.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
             ) : (
               <span className="rounded-md border border-hairline bg-ink-100 px-2.5 py-2 text-sm text-white/60">{meName}</span>

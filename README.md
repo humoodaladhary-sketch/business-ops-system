@@ -27,6 +27,10 @@ performance, deals, commissions, and **performance-based payouts**.
 - **Date-aware comp**: the **legacy** structure (25% advisor · 35% senior · 50% own/referral +
   head-of-sales override) stays in force until **1 July 2026**, when the 25/35/40/50 performance
   ladder takes over (previewable now).
+- **Live-data ready**: a Google Sheets → database **sync** (`/api/sync`, idempotent) plus a
+  DB-or-snapshot data layer (`loadData()`) so every dashboard switches to live data once synced.
+  Flip on real per-person **Supabase login** + the database by setting env — full steps in
+  [`docs/GO-LIVE.md`](docs/GO-LIVE.md).
 
 ---
 

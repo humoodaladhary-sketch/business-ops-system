@@ -233,6 +233,7 @@ model Deal {
   project        Project        @relation(fields: [projectId], references: [id])
   dealValue      Decimal        @db.Decimal(18, 3) // OMR, excl. VAT, per SPA
   canonicalStage CanonicalStage @default(RESERVATION)
+  clientName     String?
   unitType       String?
   unitNumber     String?
   // Reservation kept for funnel analytics; closeDate drives the month (Decision 3).

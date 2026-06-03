@@ -24,8 +24,13 @@ export const DealInputSchema = z.object({
   closeDate: z.date().nullable(),
   agentSplitRaw: z.number().nullable(),
   leadSource: z.enum(["ALWALAA_SOURCED", "AGENT_NETWORK"]),
+  devPaid: z.enum(["RECEIVED", "NOT_RECEIVED"]),
+  agentPaid: z.enum(["PAID", "NOT_PAID"]),
 });
 export type DealInput = z.infer<typeof DealInputSchema>;
+
+const RECEIVED = /reciev|receiv/i;
+const PAID = /^paid/i;
 
 export type RowResult =
   | { ok: true; value: DealInput }
@@ -59,6 +64,8 @@ export function validateDealRecord(rec: Record<string, unknown>): RowResult {
       ? null
       : tryParse("agentPct", () => parsePercentToFraction(rec.agentPct), null),
     leadSource: canonicalLeadSource(rec.leadSource),
+    devPaid: RECEIVED.test(String(rec.devPaidRaw ?? "")) ? "RECEIVED" : "NOT_RECEIVED",
+    agentPaid: PAID.test(String(rec.agentPaidRaw ?? "").trim()) ? "PAID" : "NOT_PAID",
   };
 
   const parsed = DealInputSchema.safeParse(candidate);

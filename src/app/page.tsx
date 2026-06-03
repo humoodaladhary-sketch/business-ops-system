@@ -1,5 +1,6 @@
 import { computePace } from "@/domain";
 import { getDemoAgents, DEMO_PERIOD } from "./_data/demo";
+import { loadData } from "./_data/source";
 import { Card, SectionTitle, StatTile, Badge, ProgressBar } from "./components/ui";
 import { TierProgress } from "./components/TierProgress";
 import { formatOMR, formatPct } from "./lib/format";
@@ -8,8 +9,8 @@ import { formatOMR, formatPct } from "./lib/format";
 const DAY_OF_MONTH = 20;
 const DAYS_IN_MONTH = 28;
 
-export default function ThursdayView() {
-  const agents = getDemoAgents();
+export default async function ThursdayView() {
+  const agents = getDemoAgents(await loadData());
   const scoring = agents.filter((a) => a.result.targetAmount > 0);
 
   const teamVolume = scoring.reduce((s, a) => s + a.result.volumeClosed, 0);

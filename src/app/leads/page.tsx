@@ -1,4 +1,4 @@
-import { LEADS } from "../_data/dataset";
+import { loadData } from "../_data/source";
 import { phoneMeta } from "../lib/phone";
 import { StatTile } from "../components/ui";
 import { LeadsTable } from "./LeadsTable";
@@ -9,7 +9,8 @@ export const metadata = { title: "Leads · Alwalaa CRM" };
 export default async function LeadsPage() {
   const session = await requireSession();
   const admin = isAdmin(session);
-  const leads = admin ? LEADS : LEADS.filter((l) => l.agentId === session.agentId);
+  const all = (await loadData()).leads;
+  const leads = admin ? all : all.filter((l) => l.agentId === session.agentId);
 
   const open = leads.filter((l) => l.stage !== "CLOSED_WON" && l.stage !== "CLOSED_LOST").length;
   const won = leads.filter((l) => l.stage === "CLOSED_WON").length;

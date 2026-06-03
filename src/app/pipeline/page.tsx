@@ -1,10 +1,11 @@
-import { DEMO_PIPELINE } from "../_data/demo";
+import { getPipeline } from "../_data/demo";
+import { loadData } from "../_data/source";
 import { PipelineBoard } from "../components/PipelineBoard";
 import { SectionTitle, StatTile, Card } from "../components/ui";
 import { formatPct } from "../lib/format";
 
-export default function PipelinePage() {
-  const counts = DEMO_PIPELINE;
+export default async function PipelinePage() {
+  const counts = getPipeline(await loadData());
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const won = counts.CLOSED_WON ?? 0;
   const lost = counts.CLOSED_LOST ?? 0;

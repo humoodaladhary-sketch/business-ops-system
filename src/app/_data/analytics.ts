@@ -1,21 +1,21 @@
-// Agent analytics derived from the consolidated finance/deal records:
-// closings and commission over time (day / week / month / all-time), earned vs
-// receivable, and rankings.
-import { AGENTS, DEALS, type DealRecord, type AgentRecord } from "./dataset";
+// Agent analytics over a DataBundle (live DB data or the baked snapshot):
+// closings & commission over time, earned vs receivable, and rankings.
+import type { DealRecord } from "./dataset";
+import type { DataBundle } from "./source";
 
 export interface AgentStats {
   agentId: string;
   name: string;
   role: string;
   status: "ACTIVE" | "FORMER";
-  deals: number; // closed-won
-  reservations: number; // SPA pending
+  deals: number;
+  reservations: number;
   volume: number;
-  gross: number; // Alwalaa gross on closed-won
-  earned: number; // agent payout already paid
-  pendingAgent: number; // agent payout not yet paid
-  alwalaaReceived: number; // developer commission received
-  alwalaaReceivable: number; // developer commission still owed
+  gross: number;
+  earned: number;
+  pendingAgent: number;
+  alwalaaReceived: number;
+  alwalaaReceivable: number;
   avgDeal: number;
   firstClose: string | null;
   lastClose: string | null;
@@ -23,9 +23,9 @@ export interface AgentStats {
 
 const won = (d: DealRecord) => d.stage === "CLOSED_WON";
 
-export function agentStats(agentId: string): AgentStats {
-  const a = AGENTS.find((x) => x.id === agentId) as AgentRecord;
-  const ds = DEALS.filter((d) => d.agentId === agentId);
+export function agentStats(data: DataBundle, agentId: string): AgentStats {
+  const a = data.agents.find((x) => x.id === agentId);
+  const ds = data.deals.filter((d) => d.agentId === agentId);
   const closed = ds.filter(won);
   const dates = closed.map((d) => d.closeDate).filter(Boolean).sort() as string[];
   const volume = closed.reduce((s, d) => s + d.value, 0);
@@ -33,7 +33,7 @@ export function agentStats(agentId: string): AgentStats {
     agentId,
     name: a?.name ?? agentId,
     role: a?.role ?? "",
-    status: a?.status ?? "ACTIVE",
+    status: a?.status === "FORMER" ? "FORMER" : "ACTIVE",
     deals: closed.length,
     reservations: ds.filter((d) => d.stage === "RESERVATION").length,
     volume,
@@ -48,39 +48,29 @@ export function agentStats(agentId: string): AgentStats {
   };
 }
 
-/** All agents that have any deal history, plus active sales agents. */
-export function allAgentStats(): AgentStats[] {
+export function allAgentStats(data: DataBundle): AgentStats[] {
   const ids = new Set<string>([
-    ...AGENTS.filter((a) => ["SENIOR", "ADVISOR", "NEW"].includes(a.role) && a.status !== "FORMER").map((a) => a.id),
-    ...DEALS.map((d) => d.agentId),
+    ...data.agents.filter((a) => ["SENIOR", "ADVISOR", "NEW"].includes(a.role) && a.status !== "FORMER").map((a) => a.id),
+    ...data.deals.map((d) => d.agentId),
   ]);
-  return Array.from(ids).map(agentStats);
+  return Array.from(ids).map((id) => agentStats(data, id));
 }
 
 export type Metric = "deals" | "volume" | "earned" | "pendingAgent" | "avgDeal";
 
-export function ranking(metric: Metric = "volume", includeFormer = false): AgentStats[] {
-  return allAgentStats()
+export function ranking(data: DataBundle, metric: Metric = "volume", includeFormer = false): AgentStats[] {
+  return allAgentStats(data)
     .filter((s) => includeFormer || s.status !== "FORMER")
     .sort((a, b) => (b[metric] as number) - (a[metric] as number));
 }
 
-// --- time buckets -----------------------------------------------------------
-
 export type Grain = "day" | "week" | "month";
-
-export interface Bucket {
-  key: string;
-  label: string;
-  deals: number;
-  volume: number;
-  commission: number;
-}
+export interface Bucket { key: string; label: string; deals: number; volume: number; commission: number }
 
 function isoWeek(d: Date): { year: number; week: number } {
   const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  const day = (date.getUTCDay() + 6) % 7; // Mon=0
-  date.setUTCDate(date.getUTCDate() - day + 3); // nearest Thursday
+  const day = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - day + 3);
   const firstThu = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
   const week = 1 + Math.round(((date.getTime() - firstThu.getTime()) / 86400000 - 3 + ((firstThu.getUTCDay() + 6) % 7)) / 7);
   return { year: date.getUTCFullYear(), week };
@@ -113,12 +103,12 @@ export function bucketize(deals: DealRecord[], grain: Grain): Bucket[] {
   return Array.from(map.values()).sort((a, b) => a.key.localeCompare(b.key));
 }
 
-export function dealsFor(agentId: string | "ALL"): DealRecord[] {
-  return agentId === "ALL" ? DEALS : DEALS.filter((d) => d.agentId === agentId);
+export function dealsFor(data: DataBundle, agentId: string | "ALL"): DealRecord[] {
+  return agentId === "ALL" ? data.deals : data.deals.filter((d) => d.agentId === agentId);
 }
 
-export function teamTotals() {
-  const s = allAgentStats();
+export function teamTotals(data: DataBundle) {
+  const s = allAgentStats(data);
   return {
     deals: s.reduce((a, b) => a + b.deals, 0),
     volume: s.reduce((a, b) => a + b.volume, 0),

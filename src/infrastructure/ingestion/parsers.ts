@@ -123,6 +123,8 @@ export const DEAL_HEADER_ALIASES: Record<string, string> = {
   "deal stage": "stageRaw",
   "deal closed on (date)": "closeDate",
   "alwalaa net ( exld vat ) commission from developer": "alwalaaGrossRaw",
+  "alwalaa comission payment status": "devPaidRaw",
+  "my comission payment status": "agentPaidRaw",
   "my comission %": "agentPct",
   "lead source": "leadSource",
 };
@@ -133,3 +135,29 @@ export function canonicalLeadSource(raw: unknown): "ALWALAA_SOURCED" | "AGENT_NE
   if (s.includes("own") || s.includes("referral") || s.includes("my own")) return "AGENT_NETWORK";
   return "ALWALAA_SOURCED";
 }
+
+// "My Leads Pipeline" headers -> canonical field keys.
+export const LEAD_HEADER_ALIASES: Record<string, string> = {
+  title: "title",
+  "lead name": "name",
+  "lead contact number": "contact",
+  email: "email",
+  "country of residence": "country",
+  "preferered language": "language",
+  "preferred language": "language",
+  "occupation type": "occupation",
+  "recieved / registred on ( date )": "registeredOn",
+  "received / registered on ( date )": "registeredOn",
+  "lead source": "leadSource",
+  "lead stage": "leadStageRaw",
+  nationality: "nationality",
+  "budget range": "budget",
+  "purpose of purchasing": "purpose",
+  "unit prefered": "unitPref",
+  "project area prefered": "areaPref",
+  "developer name": "developerName",
+  "project name": "projectName",
+  "deal status": "dealStatusRaw",
+  "my notes , comments actions": "notes",
+  "last follow up date": "lastFollowUp",
+};

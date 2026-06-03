@@ -1,7 +1,6 @@
-// Adapter: turns the real consolidated dataset into the view-models the
-// dashboards consume, computing tier/nudge via the domain engine (the July
-// ladder, shown as a preview) alongside the LEGACY recorded payouts in force
-// until COMP_NEW_EFFECTIVE.
+// Compute layer for the dashboards. Pure functions over a DataBundle (live DB
+// data or the baked snapshot). Tier/nudge come from the domain engine (the July
+// ladder, shown as a preview) alongside the LEGACY recorded payouts.
 import {
   computeMonthlyPerformance,
   evaluateAtRisk,
@@ -13,13 +12,8 @@ import {
   type NextTierNudge,
 } from "@/domain";
 import { DEFAULT_LADDER, DEFAULT_FLOORS } from "./config";
-import {
-  AGENTS,
-  DEALS,
-  LEADS,
-  DASHBOARD_PERIOD,
-  type DealRecord,
-} from "./dataset";
+import { DASHBOARD_PERIOD, type DealRecord } from "./dataset";
+import type { DataBundle } from "./source";
 
 export const DEMO_PERIOD = DASHBOARD_PERIOD;
 
@@ -29,8 +23,8 @@ function prevPeriod(period: string): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-function closedInPeriod(agentId: string, period: string): DealRecord[] {
-  return DEALS.filter((d) => d.agentId === agentId && d.period === period && d.stage === "CLOSED_WON");
+function closedInPeriod(deals: DealRecord[], agentId: string, period: string): DealRecord[] {
+  return deals.filter((d) => d.agentId === agentId && d.period === period && d.stage === "CLOSED_WON");
 }
 
 function toLines(deals: DealRecord[]): MonthlyDealLine[] {
@@ -54,61 +48,43 @@ export interface DemoAgentView {
   result: MonthlyPerformanceResult;
   atRisk: AtRiskResult;
   nudge: NextTierNudge;
-  legacyPayout: number; // recorded actuals for the period
+  legacyPayout: number;
 }
 
-function buildAgent(agentId: string, period: string): DemoAgentView {
-  const a = AGENTS.find((x) => x.id === agentId)!;
-  const deals = closedInPeriod(agentId, period);
+function buildAgent(data: DataBundle, agentId: string, period: string): DemoAgentView {
+  const a = data.agents.find((x) => x.id === agentId)!;
+  const deals = closedInPeriod(data.deals, agentId, period);
   const result = computeMonthlyPerformance({
-    agentId,
-    period,
-    targetAmount: a.target,
-    deals: toLines(deals),
-    ladder: DEFAULT_LADDER,
-    floors: DEFAULT_FLOORS,
+    agentId, period, targetAmount: a.target, deals: toLines(deals), ladder: DEFAULT_LADDER, floors: DEFAULT_FLOORS,
   });
   const legacyPayout = deals.reduce((s, d) => s + d.payout, 0);
 
-  const prev = closedInPeriod(agentId, prevPeriod(period));
+  const prev = closedInPeriod(data.deals, agentId, prevPeriod(period));
   const prevVol = prev.reduce((s, d) => s + d.value, 0);
-  const months = [
-    { period: prevPeriod(period), pctOfTarget: a.target ? prevVol / a.target : 0, dealCount: prev.length },
-    { period, pctOfTarget: result.pctOfTarget, dealCount: result.dealCount },
-  ];
   const atRisk = evaluateAtRisk({
     exempt: a.exempt ?? false,
     inRampWindow: a.rampEndDate ? new Date(a.rampEndDate).getTime() > Date.now() : false,
-    months,
+    months: [
+      { period: prevPeriod(period), pctOfTarget: a.target ? prevVol / a.target : 0, dealCount: prev.length },
+      { period, pctOfTarget: result.pctOfTarget, dealCount: result.dealCount },
+    ],
   });
 
   const nudge = computeNextTierNudge({
-    volumeClosed: result.volumeClosed,
-    targetAmount: a.target,
-    ladder: DEFAULT_LADDER,
-    alwalaaGrossMonth: result.alwalaaGrossMonth,
+    volumeClosed: result.volumeClosed, targetAmount: a.target, ladder: DEFAULT_LADDER, alwalaaGrossMonth: result.alwalaaGrossMonth,
   });
 
   return {
-    id: a.id,
-    name: a.name,
-    role: a.role,
-    exempt: a.exempt ?? false,
+    id: a.id, name: a.name, role: a.role, exempt: a.exempt ?? false,
     inRampWindow: a.rampEndDate ? new Date(a.rampEndDate).getTime() > Date.now() : false,
-    result,
-    atRisk,
-    nudge,
-    legacyPayout,
+    result, atRisk, nudge, legacyPayout,
   };
 }
 
-// Active sales agents appear on the performance views (former staff excluded).
-const SCORING = AGENTS.filter(
-  (a) => ["SENIOR", "ADVISOR", "NEW"].includes(a.role) && a.status !== "FORMER",
-);
-
-export function getDemoAgents(): DemoAgentView[] {
-  return SCORING.map((a) => buildAgent(a.id, DEMO_PERIOD));
+export function getDemoAgents(data: DataBundle): DemoAgentView[] {
+  return data.agents
+    .filter((a) => ["SENIOR", "ADVISOR", "NEW"].includes(a.role) && a.status !== "FORMER")
+    .map((a) => buildAgent(data, a.id, DEMO_PERIOD));
 }
 
 export interface CommissionRow {
@@ -126,14 +102,14 @@ export interface CommissionRow {
   source: string;
 }
 
-const NAME = new Map(AGENTS.map((a) => [a.id, a.name]));
-
-export function getDemoCommissions(): CommissionRow[] {
-  return DEALS.filter((d) => d.period === DEMO_PERIOD && d.stage === "CLOSED_WON")
+export function getDemoCommissions(data: DataBundle): CommissionRow[] {
+  const name = new Map(data.agents.map((a) => [a.id, a.name]));
+  return data.deals
+    .filter((d) => d.period === DEMO_PERIOD && d.stage === "CLOSED_WON")
     .map((d) => ({
       dealId: d.id,
       agentId: d.agentId,
-      agent: NAME.get(d.agentId) ?? d.agentId,
+      agent: name.get(d.agentId) ?? d.agentId,
       client: d.client,
       developer: d.developer,
       project: d.project,
@@ -147,11 +123,9 @@ export function getDemoCommissions(): CommissionRow[] {
     .sort((a, b) => b.agentPayout - a.agentPayout);
 }
 
-// Canonical pipeline counts derived from the real lead set.
-export const DEMO_PIPELINE: Record<string, number> = LEADS.reduce(
-  (acc, l) => {
+export function getPipeline(data: DataBundle): Record<string, number> {
+  return data.leads.reduce((acc, l) => {
     acc[l.stage] = (acc[l.stage] ?? 0) + 1;
     return acc;
-  },
-  {} as Record<string, number>,
-);
+  }, {} as Record<string, number>);
+}

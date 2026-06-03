@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import { DEAL_HEADER_ALIASES, normalizeHeader } from "./parsers";
 import { validateDealRecord, type DealInput } from "./zod-schemas";
+import { matrixToLeads, type LeadIngestResult } from "./leads";
 import type { IngestResult } from "./CsvAdapter";
 
 /**
@@ -34,6 +35,12 @@ export class GoogleSheetsAdapter {
   async ingestDeals(spreadsheetId: string, range: string): Promise<IngestResult> {
     const matrix = await this.readMatrix(spreadsheetId, range);
     return matrixToDeals(matrix);
+  }
+
+  /** Read + validate a "My Leads Pipeline" tab into lead rows + logged errors. */
+  async ingestLeads(spreadsheetId: string, range: string): Promise<LeadIngestResult> {
+    const matrix = await this.readMatrix(spreadsheetId, range);
+    return matrixToLeads(matrix);
   }
 }
 
