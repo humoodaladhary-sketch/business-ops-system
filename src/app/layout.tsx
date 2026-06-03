@@ -1,15 +1,10 @@
 import type { Metadata } from "next";
-import { Inter, Cormorant_Garamond } from "next/font/google";
 import "./globals.css";
 import { Nav } from "./components/Nav";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
-const cormorant = Cormorant_Garamond({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-cormorant",
-  display: "swap",
-});
+// Fonts (Cormorant Garamond headings · Inter body) are loaded at runtime via a
+// CSS @import in globals.css, so the production build never needs network for
+// font fetching. CSS variables --font-cormorant / --font-inter are defined there.
 
 export const metadata: Metadata = {
   title: "Alwalaa CRM — Advisory Operations",
@@ -19,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${cormorant.variable}`}>
+    <html lang="en">
       <body>
         <Nav />
         <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
