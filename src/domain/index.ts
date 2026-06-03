@@ -1,0 +1,12 @@
+// Public surface of the pure-TS domain layer. No framework/ORM imports here.
+export * from "./types";
+export * from "./money";
+export * from "./stage";
+export * from "./commission/ladder";
+export * from "./commission/sourceFloor";
+export * from "./commission/developerRate";
+export * from "./commission/payout";
+export * from "./commission/engine";
+export * from "./atRisk";
+export * from "./rewards";
+export * from "./kpi";
