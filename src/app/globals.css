@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@theme {
+  /* Alwalaa brand palette — black / gold / white */
+  --color-brand-black: #0A0A0A;
+  --color-brand-gold: #D4A017;
+  --color-brand-gold-soft: #E6B842;
+  --color-brand-white: #FFFFFF;
+  --color-brand-ivory: #FAF8F3;
+  --color-brand-gray-50: #F7F7F7;
+  --color-brand-gray-200: #E6E6E6;
+  --color-brand-gray-500: #737373;
+  --color-brand-gray-700: #2A2A2A;
+
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+  --font-body-ar: "IBM Plex Sans Arabic", "Noto Sans Arabic", sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html, body {
+  background: var(--color-brand-ivory);
+  color: var(--color-brand-black);
+  font-family: var(--font-body);
+  font-feature-settings: "cv11", "ss01";
+}
+
+body {
+  min-height: 100vh;
+}
+
+[dir="rtl"], [lang="ar"] {
+  font-family: var(--font-body-ar);
+}
+
+/* Brand utility classes */
+.brand-gradient {
+  background: linear-gradient(135deg, var(--color-brand-black) 0%, var(--color-brand-gray-700) 100%);
+}
+
+.gold-underline {
+  border-bottom: 2px solid var(--color-brand-gold);
+}
+
+.btn-primary {
+  @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-sm font-medium tracking-wide uppercase text-sm
+         bg-[var(--color-brand-black)] text-[var(--color-brand-white)]
+         hover:bg-[var(--color-brand-gray-700)] transition;
+}
+
+.btn-gold {
+  @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-sm font-semibold tracking-wide uppercase text-sm
+         bg-[var(--color-brand-gold)] text-[var(--color-brand-black)]
+         hover:bg-[var(--color-brand-gold-soft)] transition;
+}
+
+.btn-ghost {
+  @apply inline-flex items-center gap-2 px-4 py-2 rounded-sm text-sm
+         text-[var(--color-brand-gray-700)] hover:text-[var(--color-brand-black)]
+         hover:bg-[var(--color-brand-gray-50)] transition;
+}
+
+.card {
+  @apply bg-[var(--color-brand-white)] border border-[var(--color-brand-gray-200)] rounded-sm;
+}
+
+.badge {
+  @apply inline-flex items-center px-2 py-0.5 text-xs font-medium uppercase tracking-wider rounded-sm;
+}
+
+.badge-extracted { @apply bg-emerald-100 text-emerald-900; }
+.badge-inferred { @apply bg-amber-100 text-amber-900; }
+.badge-assumed { @apply bg-red-100 text-red-900; }
+.badge-missing { @apply bg-gray-100 text-gray-600; }
+.badge-gold { background: var(--color-brand-gold); color: var(--color-brand-black); }
