@@ -11,15 +11,15 @@
    - `AUTH_PROVIDER` = `supabase`
    - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
    - `INTERNAL_API_TOKEN` = any long random string
-   - `SUPER_ADMIN_EMAIL` = your email · `SUPER_ADMIN_PASSWORD` = a strong password
    - ⚠️ **Delete** the old invalid `NEXT_PUBLIC_SUPABASE_URL` value first if present.
 3. In the **Supabase SQL editor**, paste & run
    `supabase/migrations/00000000000000_init_schema.sql` (the full schema), then
    `supabase/migrations/20260603000000_auth_rls.sql` (row-level security).
-4. Open **once** in your browser:
-   `https://YOUR-APP/api/admin/bootstrap?token=YOUR_INTERNAL_API_TOKEN`
-   → it seeds the ladder/floors/developers/projects/agents/targets **and creates
-   your Super Admin login** from `SUPER_ADMIN_EMAIL`/`PASSWORD`.
+4. Open **`https://YOUR-APP/setup`** — fill in your name, email, password and the
+   `INTERNAL_API_TOKEN` value, click once: it creates your **Super Admin** account
+   and seeds the ladder/floors/developers/projects/agents/targets. *(Advanced
+   alternative: `GET /api/admin/bootstrap?token=…` with `SUPER_ADMIN_EMAIL`/
+   `SUPER_ADMIN_PASSWORD` env vars.)*
 5. Sign in at `/login` with that email + password. Then (optional) open
    `/api/sync?token=YOUR_INTERNAL_API_TOKEN` to pull the Google Sheets, and add
    team logins under **Settings → User Access**.
@@ -30,7 +30,7 @@
 > **Using the Vercel ↔ Supabase integration?** It injects `POSTGRES_PRISMA_URL`
 > automatically and the app now reads that as the connection string, so you can
 > **skip** setting `DATABASE_URL`/`DIRECT_URL` by hand. You still set
-> `AUTH_PROVIDER=supabase`, `INTERNAL_API_TOKEN`, and the `SUPER_ADMIN_*` vars.
+> `AUTH_PROVIDER=supabase` and `INTERNAL_API_TOKEN`.
 
 That's it — the app is now on live data with real per-person logins. The detailed
 version of every step is below.

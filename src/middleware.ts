@@ -7,6 +7,7 @@ export function middleware(req: NextRequest) {
 
   if (
     pathname.startsWith("/login") ||
+    pathname.startsWith("/setup") || // first-run page; its POST is token-gated
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/portal/sweep")
   ) {

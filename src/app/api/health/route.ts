@@ -44,7 +44,7 @@ export async function GET() {
   const db = out.database as { reachable?: boolean; seeded?: boolean };
   out.nextSteps = [
     db.reachable ? "✓ Database connected" : "Run init_schema.sql in the Supabase SQL editor + set the connection env vars",
-    db.seeded ? "✓ Seeded" : "Open /api/admin/bootstrap?token=YOUR_INTERNAL_API_TOKEN once",
+    db.seeded ? "✓ Seeded" : "Open /setup once (creates your Super Admin login + seeds the config)",
     (out.auth as { provider?: string }).provider === "supabase" ? "✓ Real auth on" : "Add the Supabase keys (auth still in preview mode)",
   ];
 
