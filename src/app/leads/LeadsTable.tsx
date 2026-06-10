@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { AGENTS, type LeadRecord } from "../_data/dataset";
 import { phoneMeta } from "../lib/phone";
 import { STAGE_LABELS, type CanonicalStage } from "@/domain";
@@ -85,7 +86,7 @@ export function LeadsTable({ leads, showAgentFilter = true }: { leads: LeadRecor
             {rows.map(({ lead, meta }) => (
               <tr key={lead.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
                 <td className="px-3 py-2.5">
-                  <div className="font-medium text-white">{lead.title} {lead.name}</div>
+                  <Link href={`/leads/${lead.id}`} className="font-medium text-white hover:text-gold">{lead.title} {lead.name}</Link>
                   {lead.email && <div className="text-xs text-white/40">{lead.email}</div>}
                 </td>
                 <td className="px-3 py-2.5 whitespace-nowrap text-white/80">
