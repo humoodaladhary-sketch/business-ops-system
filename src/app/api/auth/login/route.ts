@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { DEMO_COOKIE, isSupabaseConfigured, supabaseServer, type Session } from "@/infrastructure/auth/session";
+import { adminConfigured } from "@/infrastructure/auth/admin";
+import { claimFirstAdmin } from "@/app/api/admin/bootstrap/seed";
 import { AGENTS } from "@/app/_data/dataset";
 
 export const runtime = "nodejs";
@@ -29,7 +31,15 @@ export async function POST(req: NextRequest) {
   const { email, password } = parsed.data;
 
   if (isSupabaseConfigured()) {
-    const { error } = await supabaseServer().auth.signInWithPassword({ email, password });
+    const supa = supabaseServer();
+    let { error } = await supa.auth.signInWithPassword({ email, password });
+    // First-run: if no admin exists yet, this sign-in claims the Super Admin
+    // account with the password just entered, then signs in. Closed once an
+    // admin exists, so it cannot be used as a backdoor later.
+    if (error && adminConfigured()) {
+      const claim = await claimFirstAdmin(email, password);
+      if (claim.claimed) ({ error } = await supa.auth.signInWithPassword({ email, password }));
+    }
     if (error) return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
     return NextResponse.json({ ok: true });
   }

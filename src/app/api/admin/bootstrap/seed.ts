@@ -1,4 +1,4 @@
-import { prisma } from "@/infrastructure/prisma/client";
+import { prisma, hasDatabase } from "@/infrastructure/prisma/client";
 import { getLadder, getFloors, getDevRates } from "@/app/_data/runtimeConfig";
 import { AGENTS } from "@/app/_data/dataset";
 import { supabaseAdmin, adminConfigured } from "@/infrastructure/auth/admin";
@@ -98,6 +98,60 @@ export async function seedSystem(): Promise<Record<string, number>> {
   out.stageMappings = STAGE_MAP.length;
 
   return out;
+}
+
+/**
+ * First-run convenience: the very first person to sign in becomes the Super
+ * Admin, with whatever password they type. SAFE because it only runs while NO
+ * admin exists yet — once one does, this path is closed (not a backdoor). Also
+ * repairs a stale/half-created account, and seeds the config on success, so a
+ * fresh deployment goes from "Invalid email or password" to a working app in one
+ * sign-in. Returns whether the claim succeeded.
+ */
+export async function claimFirstAdmin(
+  email: string,
+  password: string,
+  name?: string,
+): Promise<{ claimed: boolean; reason?: string }> {
+  if (!adminConfigured()) return { claimed: false, reason: "supabase admin keys not configured" };
+  const admin = supabaseAdmin();
+  const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (error) return { claimed: false, reason: error.message };
+
+  const users = data.users ?? [];
+  const adminExists = users.some((u) => (u.app_metadata as { role?: string } | null)?.role === "ADMIN");
+  if (adminExists) return { claimed: false, reason: "an admin already exists" };
+
+  const e = email.trim().toLowerCase();
+  const displayName = name?.trim() || e.split("@")[0].replace(/^\w/, (c) => c.toUpperCase());
+  const existing = users.find((u) => (u.email ?? "").toLowerCase() === e);
+
+  if (existing) {
+    const { error: upErr } = await admin.auth.admin.updateUserById(existing.id, {
+      password,
+      email_confirm: true,
+      app_metadata: { ...(existing.app_metadata ?? {}), role: "ADMIN" },
+      user_metadata: { ...(existing.user_metadata ?? {}), name: (existing.user_metadata?.name as string) ?? displayName, designation: "CEO" },
+    });
+    if (upErr) return { claimed: false, reason: upErr.message };
+  } else {
+    const { error: cErr } = await admin.auth.admin.createUser({
+      email: e,
+      password,
+      email_confirm: true,
+      user_metadata: { name: displayName, designation: "CEO" },
+      app_metadata: { role: "ADMIN" },
+    });
+    if (cErr) return { claimed: false, reason: cErr.message };
+  }
+
+  // Seed the commission config so the dashboard isn't empty (best-effort).
+  try {
+    if (hasDatabase) await seedSystem();
+  } catch {
+    /* idempotent — a later /setup or bootstrap will finish it */
+  }
+  return { claimed: true };
 }
 
 /**
