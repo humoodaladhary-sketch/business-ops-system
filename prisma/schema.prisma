@@ -30,10 +30,68 @@ enum Role {
   ADVISOR
   NEW
   TRAINEE
+  SALES_HEAD
   MARKETING
   FINANCE
   LISTINGS
   CEO
+}
+
+// Omni-channel lead capture source (C1).
+enum LeadChannel {
+  WHATSAPP
+  INSTAGRAM_DM
+  INSTAGRAM_COMMENT
+  INSTAGRAM_LEAD_AD
+  FACEBOOK_LEAD_AD
+  GOOGLE_LEAD_FORM
+  WEBSITE
+  PORTAL_FEED
+  REFERRAL
+  WALKIN
+  MANUAL
+  IMPORT
+}
+
+enum ScoreBand {
+  HOT
+  WARM
+  COLD
+}
+
+enum CommChannel {
+  WHATSAPP
+  EMAIL
+  CALL
+  SMS
+  INSTAGRAM
+  SYSTEM
+  NOTE
+}
+
+enum CommDirection {
+  INBOUND
+  OUTBOUND
+  SYSTEM
+}
+
+enum CallOutcome {
+  CONNECTED
+  NO_ANSWER
+  BUSY
+  WRONG_NUMBER
+}
+
+enum UnitMarket {
+  OFF_PLAN
+  SECONDARY
+}
+
+enum UnitStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+  OFF_MARKET
 }
 
 enum Segment {
@@ -212,15 +270,30 @@ model Lead {
   assignmentStatus AssignmentStatus @default(UNCLAIMED)
   assignedAt       DateTime?
   claimExpiresAt   DateTime?
+  // Omni-channel capture + scoring (C1/C2)
+  clientId        String?
+  client          Client?        @relation(fields: [clientId], references: [id])
+  channel         LeadChannel?
+  sourceRef       String?
+  utm             Json?
+  rawPayload      Json?
+  score           Int            @default(0)
+  scoreBand       ScoreBand?
+  touchCount      Int            @default(0)
+  firstResponseAt DateTime?
+  lastInboundAt   DateTime?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
   deals Deal[]
+  comms CommunicationLog[]
 
   @@index([canonicalStage])
   @@index([assignedAgentId])
   @@index([source])
   @@index([assignmentStatus])
+  @@index([clientId])
+  @@index([scoreBand])
 }
 
 model Deal {
@@ -458,4 +531,99 @@ model IngestionError {
   createdAt DateTime     @default(now())
 
   @@index([batchId])
+}
+
+// ---------------------------------------------------------------------------
+// CRM foundations (Phase 0): Client, communications, inventory, settings, audit
+// ---------------------------------------------------------------------------
+
+// A person/buyer — leads dedup onto a Client by E.164 phone. PII lives here and
+// is access-controlled by RLS; never put it in URLs/logs.
+model Client {
+  id              String   @id @default(cuid())
+  name            String
+  primaryPhone    String   @unique // E.164
+  email           String?
+  country         String? // ISO-3166 alpha-2
+  language        String?
+  optOutWhatsapp  Boolean  @default(false)
+  optOutEmail     Boolean  @default(false)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  leads Lead[]
+}
+
+// Every touch — inbound/outbound — across channels. Central to C1/C4/C7.
+model CommunicationLog {
+  id          String        @id @default(cuid())
+  leadId      String?
+  lead        Lead?         @relation(fields: [leadId], references: [id])
+  clientId    String?
+  agentId     String?
+  dealId      String?
+  channel     CommChannel
+  direction   CommDirection
+  templateRef String? // approved WhatsApp template id (compliance)
+  body        String?
+  outcome     CallOutcome?
+  durationSec Int?
+  occurredAt  DateTime      @default(now())
+  meta        Json?
+  createdAt   DateTime      @default(now())
+
+  @@index([leadId])
+  @@index([agentId])
+  @@index([occurredAt])
+}
+
+// Inventory unit (off-plan or secondary). Soft references to project/developer
+// by id keep this decoupled. Drives C5 matching and the C9 feed.
+model Unit {
+  id           String     @id @default(cuid())
+  projectId    String?
+  developerId  String?
+  market       UnitMarket
+  unitType     String
+  unitNumber   String?
+  bedrooms     Int?
+  sizeSqm      Decimal?   @db.Decimal(10, 2)
+  priceOMR     Decimal?   @db.Decimal(18, 3)
+  status       UnitStatus @default(AVAILABLE)
+  residencyTier String?
+  published    Boolean    @default(false)
+  attributes   Json?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([projectId])
+  @@index([status])
+  @@index([published])
+}
+
+// Editable configuration (scoring weights, assignment rules, forecast probs,
+// matching weights, webhook registry, sequences) — no deploy needed.
+model Setting {
+  key       String   @id
+  value     Json
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+// Every mutation writes here (task requirement). Append-only.
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actorRole String?
+  action    String // e.g. lead.created, lead.assigned, deal.closed
+  entity    String
+  entityId  String?
+  before    Json?
+  after     Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
 }

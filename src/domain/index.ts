@@ -10,3 +10,7 @@ export * from "./commission/engine";
 export * from "./atRisk";
 export * from "./rewards";
 export * from "./kpi";
+export * from "./access";
+export * from "./crm/phone";
+export * from "./crm/extract";
+export * from "./crm/settings";
