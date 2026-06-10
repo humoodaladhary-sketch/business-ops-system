@@ -1,5 +1,20 @@
 # Going live — database, auth, and Google Sheets sync
 
+## ⚡ Fast path (15 minutes)
+
+1. Create a Supabase project → copy the 5 values (section A/B below) into
+   **Vercel → Settings → Environment Variables**, set `AUTH_PROVIDER=supabase`,
+   and redeploy.
+2. In the **Supabase SQL editor**, paste & run
+   `supabase/migrations/00000000000000_init_schema.sql` (the full schema),
+   then `supabase/migrations/*_auth_rls.sql` (row-level security).
+3. Open `https://YOUR-APP/api/admin/bootstrap` once (signed in as Super Admin) —
+   it seeds the ladder, floors, developers, projects, agents and targets.
+4. Create logins under **Settings → User Access**, and (optionally) run
+   `/api/sync` to pull the Google Sheets.
+
+Everything below is the detailed version of the same steps.
+
 Everything is built. To switch from the demo snapshot to **live data + real
 per-person login**, do the steps below. You only create two accounts (Supabase +
 a Google service account) and paste keys into Vercel. ~30 minutes.

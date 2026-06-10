@@ -3,6 +3,7 @@
 // snapshot so the app always works. Pages call loadData() and pass the bundle
 // to the (pure) compute helpers and client tables.
 import { hasDatabase, prisma } from "@/infrastructure/prisma/client";
+import { getTargetOverrides } from "./runtimeConfig";
 import {
   AGENTS, DEALS, LEADS,
   type AgentRecord, type DealRecord, type LeadRecord, type SourceTag,
@@ -16,6 +17,16 @@ export interface DataBundle {
 }
 
 const STATIC: DataBundle = { agents: AGENTS, deals: DEALS, leads: LEADS, live: false };
+
+// Settings UI target overrides apply on top of whichever source is active.
+function withTargetOverrides(bundle: DataBundle): DataBundle {
+  const overrides = getTargetOverrides();
+  if (Object.keys(overrides).length === 0) return bundle;
+  return {
+    ...bundle,
+    agents: bundle.agents.map((a) => (overrides[a.id] != null ? { ...a, target: overrides[a.id] } : a)),
+  };
+}
 const num = (v: unknown) => Number(v as never);
 const RECORD_ROLES = ["SENIOR", "ADVISOR", "NEW", "TRAINEE", "HEAD_OF_SALES", "MARKETING", "FINANCE", "CEO"];
 
@@ -28,7 +39,7 @@ function defaultTarget(role: string): number {
 }
 
 export async function loadData(): Promise<DataBundle> {
-  if (!hasDatabase) return STATIC;
+  if (!hasDatabase) return withTargetOverrides(STATIC);
   try {
     const [dbAgents, dbDeals, dbLeads, targets] = await Promise.all([
       prisma.agent.findMany(),
@@ -38,7 +49,7 @@ export async function loadData(): Promise<DataBundle> {
     ]);
 
     // Empty DB (not synced yet) → keep the snapshot.
-    if (dbDeals.length === 0 && dbLeads.length === 0) return STATIC;
+    if (dbDeals.length === 0 && dbLeads.length === 0) return withTargetOverrides(STATIC);
 
     const targetByAgent = new Map<string, number>();
     for (const t of targets) targetByAgent.set(t.agentId, Math.max(targetByAgent.get(t.agentId) ?? 0, num(t.targetAmount)));
@@ -111,8 +122,8 @@ export async function loadData(): Promise<DataBundle> {
       notes: l.notes,
     }));
 
-    return { agents, deals, leads, live: true };
+    return withTargetOverrides({ agents, deals, leads, live: true });
   } catch {
-    return STATIC;
+    return withTargetOverrides(STATIC);
   }
 }

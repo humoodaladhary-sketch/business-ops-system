@@ -10,14 +10,15 @@ export const metadata: Metadata = {
 };
 
 const BASE = [
-  { href: "/", label: "Overview" },
+  { href: "/", label: "Dashboard" },
   { href: "/leads", label: "Leads" },
+  { href: "/portal", label: "Assignment" },
   { href: "/pipeline", label: "Pipeline" },
   { href: "/deals", label: "Deals" },
+  { href: "/inventory", label: "Inventory" },
   { href: "/performance", label: "Performance" },
   { href: "/analytics", label: "Analytics" },
   { href: "/leaderboard", label: "Leaderboard" },
-  { href: "/portal", label: "Agent Portal" },
 ];
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -25,10 +26,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   const links = [...BASE];
   if (session?.role === "ADMIN") {
-    links.splice(7, 0, { href: "/agents", label: "Agents" });
-    links.push({ href: "/admin/users", label: "User Access" });
+    links.push({ href: "/agents", label: "Agents" });
+    links.push({ href: "/settings", label: "Settings" });
   } else if (session?.agentId) {
-    links.splice(7, 0, { href: `/agents/${session.agentId}`, label: "My Workspace" });
+    links.push({ href: `/agents/${session.agentId}`, label: "My Workspace" });
   }
 
   const user: ShellUser | null = session

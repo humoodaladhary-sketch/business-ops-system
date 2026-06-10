@@ -11,7 +11,7 @@ import {
   type AtRiskResult,
   type NextTierNudge,
 } from "@/domain";
-import { DEFAULT_LADDER, DEFAULT_FLOORS } from "./config";
+import { getLadder, getFloors } from "./runtimeConfig";
 import { DASHBOARD_PERIOD, type DealRecord } from "./dataset";
 import type { DataBundle } from "./source";
 
@@ -55,7 +55,7 @@ function buildAgent(data: DataBundle, agentId: string, period: string): DemoAgen
   const a = data.agents.find((x) => x.id === agentId)!;
   const deals = closedInPeriod(data.deals, agentId, period);
   const result = computeMonthlyPerformance({
-    agentId, period, targetAmount: a.target, deals: toLines(deals), ladder: DEFAULT_LADDER, floors: DEFAULT_FLOORS,
+    agentId, period, targetAmount: a.target, deals: toLines(deals), ladder: getLadder(), floors: getFloors(),
   });
   const legacyPayout = deals.reduce((s, d) => s + d.payout, 0);
 
@@ -71,7 +71,7 @@ function buildAgent(data: DataBundle, agentId: string, period: string): DemoAgen
   });
 
   const nudge = computeNextTierNudge({
-    volumeClosed: result.volumeClosed, targetAmount: a.target, ladder: DEFAULT_LADDER, alwalaaGrossMonth: result.alwalaaGrossMonth,
+    volumeClosed: result.volumeClosed, targetAmount: a.target, ladder: getLadder(), alwalaaGrossMonth: result.alwalaaGrossMonth,
   });
 
   return {

@@ -6,7 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, GitBranch, FileSignature, TrendingUp, BarChart3,
-  Trophy, UsersRound, Inbox, ShieldCheck, Menu, X, LogOut,
+  Trophy, UsersRound, Inbox, ShieldCheck, Menu, X, LogOut, Building2, Settings,
 } from "lucide-react";
 import { cn } from "../lib/cn";
 
@@ -20,6 +20,8 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/leaderboard": Trophy,
   "/agents": UsersRound,
   "/portal": Inbox,
+  "/inventory": Building2,
+  "/settings": Settings,
   "/admin/users": ShieldCheck,
 };
 
