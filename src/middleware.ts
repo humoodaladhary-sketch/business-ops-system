@@ -24,6 +24,7 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Exclude Next internals, the favicon, and the public logo assets.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.png|alwalaa-).*)"],
+  // Gate page routes only. API routes (api/*) do their own token/session auth,
+  // so machine callers (n8n, cron) aren't bounced to /login.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.png|alwalaa-|api/).*)"],
 };

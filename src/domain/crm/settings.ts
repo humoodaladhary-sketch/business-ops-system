@@ -1,6 +1,7 @@
 // Editable CRM configuration with safe defaults. Persisted in the Setting table
 // (key -> JSON) and read at runtime, falling back to these defaults. No deploy
 // needed to tune.
+import type { AssignmentRule } from "./assignment";
 
 export interface ScoringWeights {
   source: Record<string, number>; // LeadChannel -> points
@@ -49,10 +50,16 @@ export interface SlaSettings {
 }
 export const DEFAULT_SLA: SlaSettings = { responseDueMinutes: 30 };
 
+// Assignment rules (C3) — empty by default = pure inverse-load round-robin.
+// Add org-specific rules via the Settings store, e.g.
+//   { id, when:{ language:"ar", countryIn:["SA","KW","QA","BH","AE"] }, thenAgentId }
+export const DEFAULT_ASSIGNMENT: AssignmentRule[] = [];
+
 export const DEFAULT_SETTINGS = {
   scoring: DEFAULT_SCORING,
   forecast: DEFAULT_FORECAST,
   matching: DEFAULT_MATCHING,
   sla: DEFAULT_SLA,
+  assignment: DEFAULT_ASSIGNMENT,
 };
 export type SettingsKey = keyof typeof DEFAULT_SETTINGS;
