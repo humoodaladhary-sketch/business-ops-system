@@ -17,3 +17,5 @@ export * from "./crm/settings";
 export * from "./crm/score";
 export * from "./crm/dedup";
 export * from "./crm/assignment";
+export * from "./crm/matching";
+export * from "./crm/sequence";
