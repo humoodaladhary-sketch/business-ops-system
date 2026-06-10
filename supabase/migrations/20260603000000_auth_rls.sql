@@ -86,3 +86,34 @@ begin
     execute format('create policy %I_admin on %I for all using (is_admin()) with check (is_admin())', t, t);
   end loop;
 end $$;
+
+-- PII / KYC: Client records are sensitive. Admins see all; an agent sees a client
+-- only if one of that client's leads is assigned to them.
+alter table "Client" enable row level security;
+create policy client_admin_all on "Client" for all using (is_admin()) with check (is_admin());
+create policy client_agent_read on "Client" for select using (
+  exists (select 1 from "Lead" l where l."clientId" = "Client".id and l."assignedAgentId" = app_agent_id())
+);
+
+-- Conversation log: agent sees touches they made or that belong to their lead.
+alter table "CommunicationLog" enable row level security;
+create policy comm_log_admin_all on "CommunicationLog" for all using (is_admin()) with check (is_admin());
+create policy comm_log_agent_read on "CommunicationLog" for select using (
+  "agentId" = app_agent_id()
+  or exists (select 1 from "Lead" l where l.id = "CommunicationLog"."leadId" and l."assignedAgentId" = app_agent_id())
+);
+
+-- Inventory (Unit) & Settings are shared read, admin write.
+do $$
+declare t text;
+begin
+  foreach t in array array['Unit','Setting'] loop
+    execute format('alter table %I enable row level security', t);
+    execute format('create policy %I_read on %I for select using (auth.role() = ''authenticated'')', t, t);
+    execute format('create policy %I_admin on %I for all using (is_admin()) with check (is_admin())', t, t);
+  end loop;
+end $$;
+
+-- Audit log: admin-only.
+alter table "AuditLog" enable row level security;
+create policy audit_admin_all on "AuditLog" for all using (is_admin()) with check (is_admin());

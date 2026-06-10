@@ -1,3 +1,8 @@
+-- Alwalaa OS — full database schema.
+-- GENERATED from prisma/schema.prisma (prisma migrate diff) so it matches the
+-- application exactly. Run this ONCE in the Supabase SQL editor, then run
+-- 20260603000000_auth_rls.sql to enable row-level security.
+
 -- CreateEnum
 CREATE TYPE "Role" AS ENUM ('SENIOR', 'ADVISOR', 'NEW', 'TRAINEE', 'SALES_HEAD', 'MARKETING', 'FINANCE', 'LISTINGS', 'CEO');
 

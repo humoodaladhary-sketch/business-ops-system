@@ -23,6 +23,14 @@
 5. Sign in at `/login` with that email + password. Then (optional) open
    `/api/sync?token=YOUR_INTERNAL_API_TOKEN` to pull the Google Sheets, and add
    team logins under **Settings → User Access**.
+6. **Verify anytime:** open `https://YOUR-APP/api/health` — it reports, with no
+   secrets, whether the database is connected, seeded, and real auth is on, plus
+   a checklist of anything still pending.
+
+> **Using the Vercel ↔ Supabase integration?** It injects `POSTGRES_PRISMA_URL`
+> automatically and the app now reads that as the connection string, so you can
+> **skip** setting `DATABASE_URL`/`DIRECT_URL` by hand. You still set
+> `AUTH_PROVIDER=supabase`, `INTERNAL_API_TOKEN`, and the `SUPER_ADMIN_*` vars.
 
 That's it — the app is now on live data with real per-person logins. The detailed
 version of every step is below.
