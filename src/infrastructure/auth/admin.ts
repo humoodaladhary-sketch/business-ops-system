@@ -8,9 +8,9 @@ export function supabaseAdmin() {
 }
 
 export function adminConfigured(): boolean {
+  // Auto-on when the service-role key is present; AUTH_PROVIDER=preview forces off.
+  if (process.env.AUTH_PROVIDER === "preview") return false;
   return Boolean(
-    process.env.AUTH_PROVIDER === "supabase" &&
-      process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY,
   );
 }

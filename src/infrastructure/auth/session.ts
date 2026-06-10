@@ -20,13 +20,15 @@ export interface Session {
 export const DEMO_COOKIE = "alwalaa_demo_session";
 
 export function isSupabaseConfigured(): boolean {
-  // Supabase is OPT-IN: set AUTH_PROVIDER=supabase (with valid URL + anon key).
-  // Otherwise the app uses the secure demo login, so a stray/placeholder
-  // NEXT_PUBLIC_SUPABASE_URL can never 500 the app with "Invalid supabaseUrl".
-  if (process.env.AUTH_PROVIDER !== "supabase") return false;
+  // Real auth turns on automatically when valid Supabase keys are present
+  // (the service-role key is the tell — placeholders never carry one), or
+  // explicitly via AUTH_PROVIDER=supabase. Set AUTH_PROVIDER=preview to force
+  // demo mode even when keys exist.
+  if (process.env.AUTH_PROVIDER === "preview") return false;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return false;
+  if (process.env.AUTH_PROVIDER !== "supabase" && !process.env.SUPABASE_SERVICE_ROLE_KEY) return false;
   try {
     const u = new URL(url);
     return u.protocol === "http:" || u.protocol === "https:";
