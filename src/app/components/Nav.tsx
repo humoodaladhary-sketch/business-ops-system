@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getSession } from "@/infrastructure/auth/session";
+import { NavLinks } from "./NavLinks";
 
 const BASE = [
   { href: "/", label: "Overview" },
@@ -30,15 +31,7 @@ export async function Nav() {
           </span>
         </Link>
 
-        {session && (
-          <nav className="flex flex-wrap items-center gap-1 text-sm">
-            {links.map((l) => (
-              <Link key={l.href} href={l.href} className="rounded-md px-3 py-1.5 text-white/60 transition hover:bg-white/5 hover:text-gold">
-                {l.label}
-              </Link>
-            ))}
-          </nav>
-        )}
+        {session && <NavLinks links={links} />}
 
         {session && (
           <div className="flex items-center gap-3 text-sm">
