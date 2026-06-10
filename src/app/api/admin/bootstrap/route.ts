@@ -3,6 +3,7 @@ import { getSession } from "@/infrastructure/auth/session";
 import { hasDatabase, prisma } from "@/infrastructure/prisma/client";
 import { getLadder, getFloors, getDevRates } from "@/app/_data/runtimeConfig";
 import { AGENTS } from "@/app/_data/dataset";
+import { supabaseAdmin, adminConfigured } from "@/infrastructure/auth/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,8 +121,31 @@ async function run(req: NextRequest) {
     }
     out.stageMappings = STAGE_MAP.length;
 
+    // Create the first Super Admin login (resolves the no-users lockout once
+    // AUTH_PROVIDER=supabase). Idempotent — re-runs are a no-op if it exists.
+    let superAdmin: string | null = null;
+    if (adminConfigured() && process.env.SUPER_ADMIN_EMAIL && process.env.SUPER_ADMIN_PASSWORD) {
+      try {
+        const { data, error } = await supabaseAdmin().auth.admin.createUser({
+          email: process.env.SUPER_ADMIN_EMAIL,
+          password: process.env.SUPER_ADMIN_PASSWORD,
+          email_confirm: true,
+          user_metadata: { name: "Super Admin" },
+          app_metadata: { role: "ADMIN" },
+        });
+        superAdmin = error ? `not created (${error.message})` : (data.user?.email ?? "created");
+      } catch (e) {
+        superAdmin = `error: ${(e as Error).message}`;
+      }
+    }
+
     await prisma.auditLog.create({ data: { action: "system.bootstrap", entity: "System", after: out as never } });
-    return NextResponse.json({ ok: true, seeded: out, next: "Run /api/sync to pull the Google Sheets, and create logins under Settings → User Access." });
+    return NextResponse.json({
+      ok: true,
+      seeded: out,
+      superAdmin,
+      next: "Sign in with SUPER_ADMIN_EMAIL/PASSWORD, then run /api/sync and add team logins under Settings → User Access.",
+    });
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message, seededSoFar: out }, { status: 500 });
   }
