@@ -28,6 +28,16 @@ create or replace function is_admin() returns boolean language sql stable as $$
   select app_role() = 'ADMIN';
 $$;
 
+-- Idempotency: drop any policies from a previous run so this file is always
+-- safe to re-run (e.g. after a partially-applied earlier version).
+do $$
+declare r record;
+begin
+  for r in select policyname, tablename from pg_policies where schemaname = 'public' loop
+    execute format('drop policy if exists %I on %I', r.policyname, r.tablename);
+  end loop;
+end $$;
+
 -- Leads: agent sees their assigned leads ---------------------------------------
 alter table "Lead" enable row level security;
 create policy lead_admin_all on "Lead" for all using (is_admin()) with check (is_admin());
@@ -82,8 +92,8 @@ declare t text;
 begin
   foreach t in array array['CommissionLadder','LeadSourceFloor','DeveloperCommissionRule','Agent','Developer','Project','StageMapping'] loop
     execute format('alter table %I enable row level security', t);
-    execute format('create policy %I_read on %I for select using (auth.role() = ''authenticated'')', t, t);
-    execute format('create policy %I_admin on %I for all using (is_admin()) with check (is_admin())', t, t);
+    execute format('create policy %I on %I for select using (auth.role() = ''authenticated'')', t || '_read', t);
+    execute format('create policy %I on %I for all using (is_admin()) with check (is_admin())', t || '_admin', t);
   end loop;
 end $$;
 
@@ -109,8 +119,8 @@ declare t text;
 begin
   foreach t in array array['Unit','Setting'] loop
     execute format('alter table %I enable row level security', t);
-    execute format('create policy %I_read on %I for select using (auth.role() = ''authenticated'')', t, t);
-    execute format('create policy %I_admin on %I for all using (is_admin()) with check (is_admin())', t, t);
+    execute format('create policy %I on %I for select using (auth.role() = ''authenticated'')', t || '_read', t);
+    execute format('create policy %I on %I for all using (is_admin()) with check (is_admin())', t || '_admin', t);
   end loop;
 end $$;
 
