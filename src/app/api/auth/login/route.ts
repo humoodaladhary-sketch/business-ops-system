@@ -29,6 +29,27 @@ export async function POST(req: NextRequest) {
   const parsed = Schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Enter a valid email and password." }, { status: 400 });
   const { email, password } = parsed.data;
+  const emailNorm = email.toLowerCase().trim();
+
+  // TEMPORARY owner-recovery hatch (remove in Phase 6 once Supabase auth is
+  // verified). Guarantees the CEO can sign in regardless of the Supabase /
+  // preview state while auth is being wired. It issues a demo admin cookie;
+  // getSession() falls back to that cookie even in Supabase mode, so it works
+  // in both. Gated to the single owner email + a recovery password.
+  const recoveryEmail = (process.env.OWNER_EMAIL || "humood@alwalaaoman.com").toLowerCase();
+  const recoveryPassword = process.env.OWNER_RECOVERY_PASSWORD || "Walaa-CEO-Access-2026";
+  if (emailNorm === recoveryEmail && password === recoveryPassword) {
+    const session: Session = { userId: "ceo", email: recoveryEmail, name: "Humood AlAdhari", role: "ADMIN", agentId: null };
+    const res = NextResponse.json({ ok: true, recovery: true });
+    res.cookies.set(DEMO_COOKIE, JSON.stringify(session), {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 8,
+    });
+    return res;
+  }
 
   if (isSupabaseConfigured()) {
     const supa = supabaseServer();
