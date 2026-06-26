@@ -38,3 +38,12 @@ h3,
   background: rgba(201, 160, 82, 0.35);
   border-radius: 9999px;
 }
+
+/* Print: drop the dark app background + chrome so the white report sheet
+   prints cleanly. App chrome is hidden via `print:hidden` classes. */
+@media print {
+  html, body { background: #ffffff !important; }
+  main { padding: 0 !important; max-width: none !important; }
+  .report-sheet { box-shadow: none !important; border-radius: 0 !important; max-width: none !important; }
+  @page { margin: 12mm; }
+}

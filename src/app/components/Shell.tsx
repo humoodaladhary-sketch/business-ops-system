@@ -6,7 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, GitBranch, FileSignature, TrendingUp, BarChart3,
-  Trophy, UsersRound, Inbox, ShieldCheck, Menu, X, LogOut, Building2, Settings,
+  Trophy, UsersRound, Inbox, ShieldCheck, Menu, X, LogOut, Building2, Settings, FileText,
 } from "lucide-react";
 import { cn } from "../lib/cn";
 
@@ -21,6 +21,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/agents": UsersRound,
   "/portal": Inbox,
   "/inventory": Building2,
+  "/reports": FileText,
   "/settings": Settings,
   "/admin/users": ShieldCheck,
 };
@@ -78,7 +79,7 @@ export function Shell({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-hairline bg-ink-900/95 backdrop-blur transition-transform md:static md:z-auto md:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-hairline bg-ink-900/95 backdrop-blur transition-transform md:static md:z-auto md:translate-x-0 print:hidden",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -115,7 +116,7 @@ export function Shell({
 
       {/* Content */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center gap-3 border-b border-hairline px-4 py-3 md:hidden">
+        <div className="flex items-center gap-3 border-b border-hairline px-4 py-3 md:hidden print:hidden">
           <button onClick={() => setOpen(true)} aria-label="Open menu" className="text-white/70">
             <Menu className="h-6 w-6" />
           </button>
@@ -123,7 +124,7 @@ export function Shell({
           <span className="font-heading tracking-wide text-white">ALWALAA</span>
         </div>
         <main className="mx-auto w-full max-w-[1400px] flex-1 px-5 py-7 md:px-8">{children}</main>
-        <footer className="px-5 pb-8 pt-2 text-xs text-white/25 md:px-8">
+        <footer className="px-5 pb-8 pt-2 text-xs text-white/25 md:px-8 print:hidden">
           Alwalaa Real Estate · Muscat, Oman — Alwalaa OS
         </footer>
       </div>

@@ -19,6 +19,7 @@ const BASE = [
   { href: "/performance", label: "Performance" },
   { href: "/analytics", label: "Analytics" },
   { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/reports", label: "Reports" },
 ];
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
