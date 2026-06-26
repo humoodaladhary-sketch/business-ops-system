@@ -24,13 +24,8 @@ const BASE = [
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
 
-  const links = [...BASE];
-  if (session?.role === "ADMIN") {
-    links.push({ href: "/agents", label: "Agents" });
-    links.push({ href: "/settings", label: "Settings" });
-  } else if (session?.agentId) {
-    links.push({ href: `/agents/${session.agentId}`, label: "My Workspace" });
-  }
+  // Owner-only mode: no agent management, just the owner's workspace + settings.
+  const links = [...BASE, { href: "/settings", label: "Settings" }];
 
   const user: ShellUser | null = session
     ? { name: session.name, role: session.role, agentId: session.agentId }

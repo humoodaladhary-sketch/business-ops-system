@@ -68,6 +68,20 @@ function getDemoSession(): Session | null {
 }
 
 export async function getSession(): Promise<Session | null> {
+  // Owner-only mode: the app is private to you — no login, no agent accounts.
+  // Always resolve to the owner with full (ADMIN) access. The Supabase/demo
+  // auth code below is kept for when multi-user access is re-enabled.
+  return {
+    userId: "owner",
+    email: process.env.OWNER_EMAIL ?? "humood@alwalaaoman.com",
+    name: "Humood AlAdhari",
+    role: "ADMIN",
+    agentId: null,
+  };
+}
+
+// Preserved for a future multi-user mode (currently unused).
+export async function getSessionMultiUser(): Promise<Session | null> {
   if (isSupabaseConfigured()) {
     try {
       const { data } = await supabaseServer().auth.getUser();
@@ -82,7 +96,6 @@ export async function getSession(): Promise<Session | null> {
         agentId: meta.agent_id ?? null,
       };
     } catch {
-      // Misconfigured Supabase — never 500 the whole app; use the demo cookie.
       return getDemoSession();
     }
   }
