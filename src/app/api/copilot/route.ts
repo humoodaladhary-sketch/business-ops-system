@@ -18,8 +18,13 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "bad_request" }, { status: 400 });
   try {
     const out = await runCopilot(parsed.data.department, parsed.data.messages as ChatMsg[]);
+    // Lightweight observability: outcome only (no message content).
+    const o = out as { ok?: boolean; reply?: string; setup?: boolean; error?: string; status?: number };
+    const outcome = o.ok ? `ok(${(o.reply ?? "").length}c)` : o.setup ? "setup" : `error:${o.error ?? "?"}${o.status ? "/" + o.status : ""}`;
+    console.log(`[copilot] dept=${parsed.data.department} svc=${Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)} -> ${outcome}`);
     return NextResponse.json(out);
   } catch (e) {
+    console.log(`[copilot] dept=${parsed.data.department} -> threw:${(e as Error).message.slice(0, 120)}`);
     return NextResponse.json({ error: "copilot_failed", detail: (e as Error).message.slice(0, 200) });
   }
 }
