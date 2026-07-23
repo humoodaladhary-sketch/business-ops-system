@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/infrastructure/auth/session";
 import { hasDatabase, prisma } from "@/infrastructure/prisma/client";
+import { setSetting } from "@/infrastructure/prisma/settings";
 import {
   getConfig, setLadder, setFloors, setDevRates, setTarget,
 } from "@/app/_data/runtimeConfig";
@@ -19,12 +20,23 @@ const Tier = z.object({
 });
 const Floor = z.object({ source: z.enum(["ALWALAA_SOURCED", "AGENT_NETWORK"]), floorSplitRate: z.number().min(0).max(1) });
 const DevRate = z.object({ developer: z.string().min(1), ratePct: z.number().min(0).max(15) });
+const CopilotZ = z.object({
+  displayName: z.string().min(1),
+  tone: z.string().min(1),
+  directness: z.enum(["gentle", "balanced", "blunt"]),
+  formality: z.enum(["casual", "professional", "formal"]),
+  verbosity: z.enum(["terse", "balanced", "detailed"]),
+  language: z.literal("en"),
+  customInstructions: z.string(),
+  signaturePrinciples: z.array(z.string()),
+});
 
 const Body = z.discriminatedUnion("section", [
   z.object({ section: z.literal("ladder"), ladder: z.array(Tier).min(1) }),
   z.object({ section: z.literal("floors"), floors: z.array(Floor).min(1) }),
   z.object({ section: z.literal("devRates"), devRates: z.array(DevRate).min(1) }),
   z.object({ section: z.literal("target"), agentId: z.string().min(1), amount: z.number().min(0) }),
+  z.object({ section: z.literal("copilot"), copilot: CopilotZ }),
 ]);
 
 async function requireAdmin() {
@@ -48,6 +60,11 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input." }, { status: 400 });
   }
   const b = parsed.data;
+
+  if (b.section === "copilot") {
+    await setSetting("copilot", b.copilot);
+    return NextResponse.json({ ok: true, persisted: hasDatabase });
+  }
 
   // Apply immediately (drives the running engine), then persist when DB exists.
   if (b.section === "ladder") setLadder(b.ladder);
