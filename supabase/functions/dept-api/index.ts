@@ -8,7 +8,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const ORG = "6a32be59-155d-4662-9058-3a74fb2b6872";
 const TOKEN = "6e9342e74d7a4eb39720441a504ef6f33ba2c091638d3c85";
-const MODEL = Deno.env.get("ANTHROPIC_MODEL") || "claude-3-5-sonnet-latest";
+const MODEL = Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-5";
 const cors = { "content-type": "application/json", "access-control-allow-origin": "*", "access-control-allow-headers": "content-type,x-sync-token" };
 
 // deno-lint-ignore no-explicit-any

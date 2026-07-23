@@ -14,7 +14,7 @@ import { deptApi } from "@/lib/deptApi";
 //   3. Supabase edge function (chat)   -> holds its own ANTHROPIC_API_KEY secret.
 // The department page's live data always works independently of all of this.
 
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest";
+const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
 export type ChatMsg = { role: "user" | "assistant"; content: unknown };
