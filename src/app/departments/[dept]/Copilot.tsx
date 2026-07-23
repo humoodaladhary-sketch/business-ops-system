@@ -12,7 +12,7 @@ export function Copilot({ department, starters }: { department: string; starters
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [setup, setSetup] = useState<{ anthropicKey: boolean; supabase: boolean } | null>(null);
+  const [setup, setSetup] = useState<boolean>(false);
   const [err, setErr] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -32,7 +32,7 @@ export function Copilot({ department, starters }: { department: string; starters
       });
       const j = await r.json();
       if (j.setup) {
-        setSetup(j.missing);
+        setSetup(true);
       } else if (j.error) {
         setErr(j.detail ? `${j.error}: ${j.detail}` : j.error);
       } else {
@@ -49,14 +49,16 @@ export function Copilot({ department, starters }: { department: string; starters
   if (setup) {
     return (
       <div className="rounded-xl border border-gold/30 bg-gold/5 p-5 text-sm">
-        <div className="mb-2 font-semibold text-gold">Copilots need two keys in Vercel (one-time)</div>
-        <p className="mb-3 text-white/70">Add these under Vercel → Settings → Environment Variables, then redeploy:</p>
-        <ul className="space-y-1.5 text-white/80">
-          <li>{setup.supabase ? "✓" : "✗"} <code className="text-gold">NEXT_PUBLIC_SUPABASE_URL</code> = <span className="text-white/60">https://hpxaaiaoasgoazpgilht.supabase.co</span></li>
-          <li>{setup.supabase ? "✓" : "✗"} <code className="text-gold">SUPABASE_SERVICE_ROLE_KEY</code> = <span className="text-white/60">Supabase → Settings → API → service_role</span></li>
-          <li>{setup.anthropicKey ? "✓" : "✗"} <code className="text-gold">ANTHROPIC_API_KEY</code> = <span className="text-white/60">console.anthropic.com → API keys</span></li>
-        </ul>
-        <button onClick={() => setSetup(null)} className="mt-4 rounded-md border border-hairline px-3 py-1.5 text-white/70 hover:text-gold">Done — retry</button>
+        <div className="mb-2 font-semibold text-gold">One key to switch the copilots on</div>
+        <p className="mb-3 text-white/70">
+          The data above is already live. The AI chat just needs your Anthropic key — added <b>once</b>, no redeploy:
+        </p>
+        <ol className="ml-4 list-decimal space-y-1.5 text-white/80">
+          <li>Get a key at <span className="text-gold">console.anthropic.com → API keys</span></li>
+          <li>Supabase → your project → <span className="text-gold">Edge Functions → Manage secrets</span></li>
+          <li>Add secret <code className="text-gold">ANTHROPIC_API_KEY</code> = your key → Save</li>
+        </ol>
+        <button onClick={() => setSetup(false)} className="mt-4 rounded-md border border-hairline px-3 py-1.5 text-white/70 hover:text-gold">Done — retry</button>
       </div>
     );
   }
