@@ -49,15 +49,18 @@ export function Copilot({ department, starters }: { department: string; starters
   if (setup) {
     return (
       <div className="rounded-xl border border-gold/30 bg-gold/5 p-5 text-sm">
-        <div className="mb-2 font-semibold text-gold">One key to switch the copilots on</div>
+        <div className="mb-2 font-semibold text-gold">Turn on the AI chat — one time</div>
         <p className="mb-3 text-white/70">
-          The data above is already live. The AI chat just needs your Anthropic key — added <b>once</b>, no redeploy:
+          The live data above is already working. The chat just needs an Anthropic key, added <b>once</b>:
         </p>
         <ol className="ml-4 list-decimal space-y-1.5 text-white/80">
           <li>Get a key at <span className="text-gold">console.anthropic.com → API keys</span></li>
-          <li>Supabase → your project → <span className="text-gold">Edge Functions → Manage secrets</span></li>
-          <li>Add secret <code className="text-gold">ANTHROPIC_API_KEY</code> = your key → Save</li>
+          <li>Vercel → this project → <span className="text-gold">Settings → Environment Variables</span></li>
+          <li>Add <code className="text-gold">ANTHROPIC_API_KEY</code> = your key, then <span className="text-gold">Redeploy</span></li>
         </ol>
+        <p className="mt-3 text-xs text-white/45">
+          Prefer zero keys? This can also run through your existing n8n Anthropic connection — just ask.
+        </p>
         <button onClick={() => setSetup(false)} className="mt-4 rounded-md border border-hairline px-3 py-1.5 text-white/70 hover:text-gold">Done — retry</button>
       </div>
     );
