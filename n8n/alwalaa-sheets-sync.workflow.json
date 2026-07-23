@@ -1,0 +1,296 @@
+{
+  "name": "Alwalaa Sheets Sync → sheets-ingest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 15 }] }
+      },
+      "id": "a0000000-0000-4000-8000-scheduletrig01",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 100]
+    },
+
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": { "__rl": true, "mode": "id", "value": "1om5DiSVPFbW0twHLPwY7FbBmLJ4_c9gG" },
+        "sheetName": { "__rl": true, "mode": "list", "value": "REPLACE_WITH_TAB_GID", "cachedResultName": "Employee Register" },
+        "options": {}
+      },
+      "id": "b0000000-0000-4000-8000-readstaff00001",
+      "name": "Read — HR Employee Register",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 100],
+      "credentials": { "googleApi": { "id": "REPLACE_GOOGLE_SA_CREDENTIAL_ID", "name": "Alwalaa Google Service Account" } }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Fn — map staff: forward 'Employee Register' rows as { entity, rows }.\n// Authoritative source->table mapping + normalization live in the sheets-ingest\n// edge function; this node only tags the entity and passes the raw rows through.\nconst rows = $input.all().map(i => i.json);\nreturn [{ json: { entity: 'staff', rows } }];"
+      },
+      "id": "c0000000-0000-4000-8000-fnstaff0000001",
+      "name": "Fn — map staff",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SHEETS_INGEST_URL }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "x-sync-token", "value": "={{ $env.SHEETS_INGEST_TOKEN }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { entity: $json.entity, rows: $json.rows } }}",
+        "options": {}
+      },
+      "id": "d0000000-0000-4000-8000-poststaff00001",
+      "name": "POST staff → sheets-ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [980, 100]
+    },
+
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": { "__rl": true, "mode": "id", "value": "1MVhHL-5SFxEhP-IiGUKlC2G3IIgoVfR3PsQ8TEvrJHk" },
+        "sheetName": { "__rl": true, "mode": "list", "value": "REPLACE_WITH_TAB_GID", "cachedResultName": "Master Listing (main tab)" },
+        "options": {}
+      },
+      "id": "b0000000-0000-4000-8000-readunits00001",
+      "name": "Read — Master Listing Tracker",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 260],
+      "credentials": { "googleApi": { "id": "REPLACE_GOOGLE_SA_CREDENTIAL_ID", "name": "Alwalaa Google Service Account" } }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Fn — map units.\nconst rows = $input.all().map(i => i.json);\nreturn [{ json: { entity: 'units', rows } }];"
+      },
+      "id": "c0000000-0000-4000-8000-fnunits0000001",
+      "name": "Fn — map units",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 260]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SHEETS_INGEST_URL }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "x-sync-token", "value": "={{ $env.SHEETS_INGEST_TOKEN }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { entity: $json.entity, rows: $json.rows } }}",
+        "options": {}
+      },
+      "id": "d0000000-0000-4000-8000-postunits00001",
+      "name": "POST units → sheets-ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [980, 260]
+    },
+
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": { "__rl": true, "mode": "id", "value": "1dQCcNSvWWtnkNg0swxnKRv8xTW-yMNCOPJ7oskWUZfY" },
+        "sheetName": { "__rl": true, "mode": "list", "value": "REPLACE_WITH_TAB_GID", "cachedResultName": "WHIN register (1 of 3 tabs — see SYNC-SETUP.md)" },
+        "options": {}
+      },
+      "id": "b0000000-0000-4000-8000-readleads00001",
+      "name": "Read — Investor Qualification (Responses)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 420],
+      "credentials": { "googleApi": { "id": "REPLACE_GOOGLE_SA_CREDENTIAL_ID", "name": "Alwalaa Google Service Account" } }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Fn — map leads. NOTE: this source has THREE tabs (form responses; WHIN\n// register with Lead ID L001; B2B import). Add one Read node per tab and merge,\n// or run this workflow three times with the tab swapped. See SYNC-SETUP.md.\nconst rows = $input.all().map(i => i.json);\nreturn [{ json: { entity: 'leads', rows } }];"
+      },
+      "id": "c0000000-0000-4000-8000-fnleads0000001",
+      "name": "Fn — map leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SHEETS_INGEST_URL }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "x-sync-token", "value": "={{ $env.SHEETS_INGEST_TOKEN }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { entity: $json.entity, rows: $json.rows } }}",
+        "options": {}
+      },
+      "id": "d0000000-0000-4000-8000-postleads00001",
+      "name": "POST leads → sheets-ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [980, 420]
+    },
+
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": { "__rl": true, "mode": "id", "value": "1B4XP-Udfuiuw1FZdgpgPZqUhNPmT4qH8MiG5hvhcPZ0" },
+        "sheetName": { "__rl": true, "mode": "list", "value": "REPLACE_WITH_TAB_GID", "cachedResultName": "Master Deals" },
+        "options": {}
+      },
+      "id": "b0000000-0000-4000-8000-readdeals00001",
+      "name": "Read — Master CRM Master Deals",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 580],
+      "credentials": { "googleApi": { "id": "REPLACE_GOOGLE_SA_CREDENTIAL_ID", "name": "Alwalaa Google Service Account" } }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Fn — map deals. Use the 'Master Deals' tab, NOT the raw JSON tab.\nconst rows = $input.all().map(i => i.json);\nreturn [{ json: { entity: 'deals', rows } }];"
+      },
+      "id": "c0000000-0000-4000-8000-fndeals0000001",
+      "name": "Fn — map deals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 580]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SHEETS_INGEST_URL }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "x-sync-token", "value": "={{ $env.SHEETS_INGEST_TOKEN }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { entity: $json.entity, rows: $json.rows } }}",
+        "options": {}
+      },
+      "id": "d0000000-0000-4000-8000-postdeals00001",
+      "name": "POST deals → sheets-ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [980, 580]
+    },
+
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": { "__rl": true, "mode": "id", "value": "1QlAgP_nFj6Ck2QmgLCf6QwEouw8NNHrG" },
+        "sheetName": { "__rl": true, "mode": "list", "value": "REPLACE_WITH_TAB_GID", "cachedResultName": "INV Detail" },
+        "options": {}
+      },
+      "id": "b0000000-0000-4000-8000-readinv0000001",
+      "name": "Read — Invoice INV Detail",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 740],
+      "credentials": { "googleApi": { "id": "REPLACE_GOOGLE_SA_CREDENTIAL_ID", "name": "Alwalaa Google Service Account" } }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Fn — map invoices (from 'INV Detail').\nconst rows = $input.all().map(i => i.json);\nreturn [{ json: { entity: 'invoices', rows } }];"
+      },
+      "id": "c0000000-0000-4000-8000-fninvoices0001",
+      "name": "Fn — map invoices",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 740]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SHEETS_INGEST_URL }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "x-sync-token", "value": "={{ $env.SHEETS_INGEST_TOKEN }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { entity: $json.entity, rows: $json.rows } }}",
+        "options": {}
+      },
+      "id": "d0000000-0000-4000-8000-postinvoices01",
+      "name": "POST invoices → sheets-ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [980, 740]
+    },
+
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Fn — map collections: reuse the SAME 'INV Detail' rows the invoices step read.\n// Wired AFTER 'POST invoices' only to keep the FK-safe order (invoices before\n// collections); the rows are pulled by node name, not from the previous output.\nconst rows = $('Read — Invoice INV Detail').all().map(i => i.json);\nreturn [{ json: { entity: 'collections', rows } }];"
+      },
+      "id": "c0000000-0000-4000-8000-fncollections1",
+      "name": "Fn — map collections",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 900]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SHEETS_INGEST_URL }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "x-sync-token", "value": "={{ $env.SHEETS_INGEST_TOKEN }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { entity: $json.entity, rows: $json.rows } }}",
+        "options": {}
+      },
+      "id": "d0000000-0000-4000-8000-postcollect001",
+      "name": "POST collections → sheets-ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [980, 900]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": { "main": [[{ "node": "Read — HR Employee Register", "type": "main", "index": 0 }]] },
+
+    "Read — HR Employee Register": { "main": [[{ "node": "Fn — map staff", "type": "main", "index": 0 }]] },
+    "Fn — map staff": { "main": [[{ "node": "POST staff → sheets-ingest", "type": "main", "index": 0 }]] },
+    "POST staff → sheets-ingest": { "main": [[{ "node": "Read — Master Listing Tracker", "type": "main", "index": 0 }]] },
+
+    "Read — Master Listing Tracker": { "main": [[{ "node": "Fn — map units", "type": "main", "index": 0 }]] },
+    "Fn — map units": { "main": [[{ "node": "POST units → sheets-ingest", "type": "main", "index": 0 }]] },
+    "POST units → sheets-ingest": { "main": [[{ "node": "Read — Investor Qualification (Responses)", "type": "main", "index": 0 }]] },
+
+    "Read — Investor Qualification (Responses)": { "main": [[{ "node": "Fn — map leads", "type": "main", "index": 0 }]] },
+    "Fn — map leads": { "main": [[{ "node": "POST leads → sheets-ingest", "type": "main", "index": 0 }]] },
+    "POST leads → sheets-ingest": { "main": [[{ "node": "Read — Master CRM Master Deals", "type": "main", "index": 0 }]] },
+
+    "Read — Master CRM Master Deals": { "main": [[{ "node": "Fn — map deals", "type": "main", "index": 0 }]] },
+    "Fn — map deals": { "main": [[{ "node": "POST deals → sheets-ingest", "type": "main", "index": 0 }]] },
+    "POST deals → sheets-ingest": { "main": [[{ "node": "Read — Invoice INV Detail", "type": "main", "index": 0 }]] },
+
+    "Read — Invoice INV Detail": { "main": [[{ "node": "Fn — map invoices", "type": "main", "index": 0 }]] },
+    "Fn — map invoices": { "main": [[{ "node": "POST invoices → sheets-ingest", "type": "main", "index": 0 }]] },
+    "POST invoices → sheets-ingest": { "main": [[{ "node": "Fn — map collections", "type": "main", "index": 0 }]] },
+
+    "Fn — map collections": { "main": [[{ "node": "POST collections → sheets-ingest", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}
