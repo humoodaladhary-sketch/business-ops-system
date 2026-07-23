@@ -11,6 +11,7 @@ export const metadata: Metadata = {
 
 const BASE = [
   { href: "/", label: "Dashboard" },
+  { href: "/departments", label: "Departments" },
   { href: "/leads", label: "Leads" },
   { href: "/portal", label: "Assignment" },
   { href: "/pipeline", label: "Pipeline" },
