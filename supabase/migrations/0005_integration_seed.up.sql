@@ -38,3 +38,23 @@ create unique index if not exists invoices_org_ext_uniq    on invoices(organizat
 create unique index if not exists collections_org_ext_uniq on collections(organization_id, external_id) where external_id is not null;
 create unique index if not exists leads_org_ext_uniq       on leads(organization_id, external_id)       where external_id is not null;
 create unique index if not exists deals_org_ext_uniq       on deals(organization_id, external_id)       where external_id is not null;
+
+-- Seed the Oman leave categories now that the org row exists (the HR module's
+-- own seed ran before the org and found nothing). Idempotent.
+do $$
+declare o record;
+begin
+  for o in select id from organizations loop
+    insert into leave_types (organization_id, code, name_en, name_ar, paid, default_days_per_year, oman_labour_note) values
+      (o.id,'annual','Annual Leave','إجازة سنوية',true,30,'RD 53/2023 — verify'),
+      (o.id,'sick','Sick Leave','إجازة مرضية',true,null,'Tiered pay per law — verify'),
+      (o.id,'emergency','Emergency Leave','إجازة طارئة',true,null,'Per contract policy'),
+      (o.id,'maternity','Maternity Leave','إجازة أمومة',true,98,'RD 53/2023 — verify'),
+      (o.id,'paternity','Paternity Leave','إجازة أبوة',true,7,'Verify'),
+      (o.id,'bereavement','Bereavement Leave','إجازة وفاة',true,null,'Verify by relation'),
+      (o.id,'marriage','Marriage Leave','إجازة زواج',true,3,'Verify'),
+      (o.id,'hajj','Hajj Leave','إجازة حج',true,15,'Once in service — verify'),
+      (o.id,'unpaid','Unpaid Leave','إجازة بدون راتب',false,null,'By approval')
+    on conflict (organization_id, code) do nothing;
+  end loop;
+end $$;
