@@ -55,11 +55,37 @@ export const DEFAULT_SLA: SlaSettings = { responseDueMinutes: 30 };
 //   { id, when:{ language:"ar", countryIn:["SA","KW","QA","BH","AE"] }, thenAgentId }
 export const DEFAULT_ASSIGNMENT: AssignmentRule[] = [];
 
+export interface CopilotPersona {
+  displayName: string;
+  tone: string;
+  directness: "gentle" | "balanced" | "blunt";
+  formality: "casual" | "professional" | "formal";
+  verbosity: "terse" | "balanced" | "detailed";
+  language: "en";
+  customInstructions: string;
+  signaturePrinciples: string[];
+}
+export const DEFAULT_COPILOT: CopilotPersona = {
+  displayName: "Alwalaa Copilot",
+  tone: "a sharp, direct chief-of-staff — warm but no fluff",
+  directness: "blunt",
+  formality: "professional",
+  verbosity: "terse",
+  language: "en",
+  customInstructions: "",
+  signaturePrinciples: [
+    "Answer first, then the why.",
+    "Quantify in OMR; never fabricate a figure.",
+    "Never dead-end — always give the next step or say exactly what is needed to unblock.",
+    "Surface risk the owner has not asked about (overdue cash, expiring documents, momentum drops).",
+  ],
+};
 export const DEFAULT_SETTINGS = {
   scoring: DEFAULT_SCORING,
   forecast: DEFAULT_FORECAST,
   matching: DEFAULT_MATCHING,
   sla: DEFAULT_SLA,
   assignment: DEFAULT_ASSIGNMENT,
+  copilot: DEFAULT_COPILOT,
 };
 export type SettingsKey = keyof typeof DEFAULT_SETTINGS;

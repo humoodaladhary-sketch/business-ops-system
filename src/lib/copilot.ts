@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getDepartment } from "@/app/_departments/config";
+import { composeSystem } from "@/app/_departments/persona";
 import { deptApi } from "@/lib/deptApi";
 
 // Server-side copilot runner. It lights up from whatever credential is present,
@@ -30,13 +31,6 @@ type Snapshot = {
   table?: { title: string; columns: string[]; rows: Record<string, unknown>[] } | null;
   error?: string;
 };
-
-const today = () => new Date().toISOString().slice(0, 10);
-
-function systemPrompt(deptId: string): string {
-  const dept = getDepartment(deptId);
-  return `${dept?.system ?? "You are a department copilot for Alwalaa Real Estate."} Today is ${today()}.`;
-}
 
 // Turn a live snapshot into compact grounding text for the no-tools path.
 function groundingText(snap: Snapshot): string {
@@ -76,7 +70,7 @@ async function toolLoop(key: string, db: SupabaseClient, deptId: string, message
   const convo: ChatMsg[] = [...messages];
 
   for (let step = 0; step < 6; step++) {
-    const res = await callAnthropic(key, { model: MODEL, max_tokens: 1400, system: systemPrompt(deptId), tools, messages: convo });
+    const res = await callAnthropic(key, { model: MODEL, max_tokens: 1400, system: await composeSystem(deptId), tools, messages: convo });
     if (!res.ok) return { error: "anthropic", status: res.status, detail: (await res.text()).slice(0, 400) };
     const data = await res.json();
     convo.push({ role: "assistant", content: data.content });
@@ -113,8 +107,8 @@ async function groundedChat(key: string, deptId: string, messages: ChatMsg[]): P
     /* data optional — copilot still answers, just without live figures */
   }
   const system = grounding
-    ? `${systemPrompt(deptId)}\n\nLIVE DATA (as of now, use these exact figures; do not invent others):\n${grounding}`
-    : `${systemPrompt(deptId)}\n\nLive data is unavailable right now — say so if asked for specific figures.`;
+    ? `${await composeSystem(deptId)}\n\nLIVE DATA (as of now, use these exact figures; do not invent others):\n${grounding}`
+    : `${await composeSystem(deptId)}\n\nLive data is unavailable right now — say so if asked for specific figures.`;
   const res = await callAnthropic(key, { model: MODEL, max_tokens: 1200, system, messages });
   if (!res.ok) return { error: "anthropic", status: res.status, detail: (await res.text()).slice(0, 400) };
   const data = await res.json();
@@ -132,8 +126,8 @@ async function webhookChat(url: string, deptId: string, messages: ChatMsg[]): Pr
     /* optional */
   }
   const system = grounding
-    ? `${systemPrompt(deptId)}\n\nLIVE DATA (use these exact figures):\n${grounding}`
-    : systemPrompt(deptId);
+    ? `${await composeSystem(deptId)}\n\nLIVE DATA (use these exact figures):\n${grounding}`
+    : await composeSystem(deptId);
   try {
     const res = await fetch(url, {
       method: "POST",
