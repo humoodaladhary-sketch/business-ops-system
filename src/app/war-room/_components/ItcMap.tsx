@@ -12,10 +12,11 @@
 import "leaflet/dist/leaflet.css";
 
 import { useMemo } from "react";
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import { MapContainer, Marker, Polygon, Popup, TileLayer } from "react-leaflet";
 import L from "leaflet";
 
 import { ITC_PROJECTS } from "@/app/_data/itc-zones";
+import { ZONE_BOUNDARIES, ZONE_COLORS, ZONE_KIND_LABEL } from "@/app/_data/itc-zone-boundaries";
 
 // Muscat-centred view of northern Oman.
 const CENTER: L.LatLngExpression = [23.6, 58.4];
@@ -57,6 +58,46 @@ export function ItcMap() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution="&copy; OpenStreetMap contributors"
         />
+
+        {/* Shaded zone boundaries — tap for the presentation brief. Rendered
+            before the pins so markers stay clickable on top. */}
+        {ZONE_BOUNDARIES.map((z) => {
+          const color = ZONE_COLORS[z.kind];
+          const openToAll = z.ownershipEligibility === "all_nationalities";
+          return (
+            <Polygon
+              key={z.id}
+              positions={z.ring as L.LatLngExpression[]}
+              pathOptions={{ color, weight: 2, fillColor: color, fillOpacity: 0.14 }}
+            >
+              <Popup>
+                <div style={{ maxWidth: 262 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.25, color: "#1e293b" }}>
+                    {z.name}
+                  </div>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      marginTop: 6,
+                      padding: "2px 9px",
+                      borderRadius: 9999,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      background: openToAll ? "#fbf1d9" : "#eef2f6",
+                      border: openToAll ? "1px solid #e6d3a3" : "1px solid #cbd5e1",
+                      color: openToAll ? "#7a5c1e" : "#475569",
+                    }}
+                  >
+                    {ZONE_KIND_LABEL[z.kind]}
+                  </span>
+                  <p style={{ margin: "8px 0 0", fontSize: 12, lineHeight: 1.4, color: "#475569" }}>
+                    {z.brief}
+                  </p>
+                </div>
+              </Popup>
+            </Polygon>
+          );
+        })}
 
         {ITC_PROJECTS.map((p) => {
           const openToAll = p.ownershipEligibility === "all_nationalities";
@@ -132,16 +173,21 @@ export function ItcMap() {
           pointer-events-none so it never intercepts map drag/zoom. */}
       <div className="pointer-events-none absolute right-3 top-3 z-[1000] rounded-xl border border-hairline bg-ink-100/90 px-3 py-2.5 text-[11px] leading-tight text-white/85 shadow-lg backdrop-blur">
         <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-white/55">
-          Ownership
+          Zones
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-block h-2.5 w-2.5 rounded-full bg-gold ring-1 ring-white/40" />
-          <span>All nationalities — ITC</span>
+          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: "#D7A52C" }} />
+          <span>ITC — all nationalities</span>
         </div>
         <div className="mt-1.5 flex items-center gap-2">
-          <span className="inline-block h-2.5 w-2.5 rounded-full bg-slate-500 ring-1 ring-white/40" />
-          <span>GCC / Omani only</span>
+          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: "#4F7CAC" }} />
+          <span>Sultan Haitham City</span>
         </div>
+        <div className="mt-1.5 flex items-center gap-2">
+          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: "#9E6D7C" }} />
+          <span>Surooh</span>
+        </div>
+        <div className="mt-2 text-[10px] text-white/45">Pins = projects · tap for details</div>
       </div>
     </div>
   );
