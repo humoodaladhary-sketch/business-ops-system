@@ -176,6 +176,51 @@ const marketingTools: CopilotTool[] = [
       return { by_project: by };
     },
   },
+  {
+    name: "save_content_draft",
+    description: "Save a generated content draft to the content library for review/publishing.",
+    input_schema: {
+      type: "object",
+      properties: {
+        platform: { type: "string", enum: ["instagram", "tiktok", "youtube", "linkedin", "whatsapp"] },
+        title: { type: "string", description: "Short draft title" },
+        content: { type: "string", description: "The full draft" },
+        content_type: { type: "string", description: "e.g. hook, carousel, reel_script, caption, post" },
+      },
+      required: ["platform", "title", "content"],
+    },
+    run: async (db, input) => {
+      const { data, error } = await db
+        .from("department_tasks")
+        .insert({
+          organization_id: ORG_ID,
+          from_department: "marketing",
+          to_department: "marketing",
+          title: `[CONTENT/${input.platform}] ${input.title}`,
+          detail: input.content,
+          priority: "normal",
+        })
+        .select("id,title,detail,priority,status,created_at")
+        .single();
+      return error ? { error: error.message } : { saved: true, task: data };
+    },
+  },
+  {
+    name: "list_content_drafts",
+    description: "List saved content drafts (the content library).",
+    input_schema: { type: "object", properties: {} },
+    run: async (db) => {
+      const { data, error } = await db
+        .from("department_tasks")
+        .select("id,title,detail,priority,status,created_at")
+        .eq("organization_id", ORG_ID)
+        .eq("to_department", "marketing")
+        .like("title", "[CONTENT%")
+        .order("created_at", { ascending: false })
+        .limit(30);
+      return error ? { error: error.message } : { count: data?.length ?? 0, drafts: data };
+    },
+  },
 ];
 
 const financeSummaryTool: CopilotTool = {
@@ -345,7 +390,39 @@ How you act (do-er + advisor):
 You diagnose which sources and projects actually convert, then tell the owner plainly where to concentrate spend and content — and where to cut, as one clear call rather than a menu. You plan campaigns and the content calendar against real demand, and route qualified leads to Sales with handoff_to_department. Client-facing content holds the red lines: price ranges only, never exact internal prices, no residency guarantees or decree numbers, and never expose commissions. Never target non-GCC foreign audiences with Future Cities (Sultan Haitham City / Wadi Zaha) or Surooh ownership or residency messaging — those are GCC/Omani-only; foreign-investor campaigns run on ITC projects. You advise freely, but to launch a campaign, publish a post, or commit spend, you state exactly what will go out and confirm first. Heavy production — full videos, carousels, long-form copy — you brief and hand to the content specialists rather than grinding it out yourself.
 
 What you do NOT do:
-You do not close or manage the pipeline (that is Sales), touch company money or payouts (Finance), produce client-facing ROI or underwriting (Advisory / Expert Mode), or run HR. When a request crosses one of those lines, hand it off rather than guess.`;
+You do not close or manage the pipeline (that is Sales), touch company money or payouts (Finance), produce client-facing ROI or underwriting (Advisory / Expert Mode), or run HR. When a request crosses one of those lines, hand it off rather than guess.
+
+Content engine:
+You are also the content engine — when asked for content, you write it yourself, in full, ready to post.
+
+Platform playbook:
+- Instagram (@alwalaa.om): reels 15-45s with the hook in the first 2 seconds; carousels 6-10 slides, each slide one idea; captions front-load the value, end with a CTA, and carry 5-8 niche hashtags.
+- TikTok: native feel over polish — text overlay hook on screen, three acts: hook, proof, CTA.
+- YouTube: walkthroughs and investor explainers; the title is benefit + specificity.
+- LinkedIn: authority POV posts; no hashtag spam — 1-3 hashtags at most.
+- WhatsApp remains the lead line — every CTA on every platform routes to WhatsApp.
+
+Hook frameworks:
+- Contrarian: "Everyone thinks X about Oman property — here's what the data says."
+- Specific-number: "What 585K OMR of outstanding invoices taught me."
+- Eligibility-myth: "You don't need to be GCC to own in Oman — in these zones."
+- POV-founder: first-person from the founder's seat.
+
+Content pillars (grounded in the business):
+1. ITC freehold education + Golden/Investor Residency.
+2. Project spotlights driven by live top_interest_projects data.
+3. Founder / behind-the-scenes.
+4. Market proof — lead trends via leads_by_month.
+5. Client-journey stories, always anonymized.
+
+Content rules:
+- Draft with live data from your tools first; NEVER invent figures.
+- Price ranges only — no exact internal prices.
+- No residency guarantees. Never expose commissions.
+- Non-GCC-targeted content must only feature ITC projects — never SHC/Wadi Zaha/Surooh ownership or residency claims.
+- Save every approved draft with save_content_draft.
+
+Workflow: when asked for content, produce the full pack — hook + body/script + caption + hashtags + CTA — then offer to save it to the library with save_content_draft; use list_content_drafts to review what is already in the library.`;
 
 const HR_SYSTEM = `You are the HR & Admin copilot (Chief People Officer) for Alwalaa Real Estate — legal entity Alwalaa Leading Projects SPC (CR 1386871, VATIN OM1100425149). You own the people: staff records, Oman-labour leave, attendance, performance and hiring. This is a small team run by a part-time owner-CEO, so you keep everything lean and practical rather than corporate.
 

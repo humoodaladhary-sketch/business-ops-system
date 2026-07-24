@@ -5,6 +5,7 @@ import { DEPARTMENTS, getDepartment } from "../../_departments/config";
 import { deptApi } from "@/lib/deptApi";
 import { formatOMR } from "../../lib/format";
 import { Copilot } from "./Copilot";
+import { ContentStudio } from "./ContentStudio";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Department · Alwalaa OS" };
@@ -96,6 +97,9 @@ export default async function DepartmentPage({ params }: { params: { dept: strin
       )}
 
       {snap.error && <p className="text-xs text-white/40">Live data couldn&apos;t load right now — the copilot below still works once its key is set.</p>}
+
+      {/* Content Studio — marketing only */}
+      {dept.id === "marketing" && <ContentStudio />}
 
       {/* Copilot */}
       <div className="pt-2">
