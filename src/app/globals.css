@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Marcellus&family=Hanken+Grotesk:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,12 +6,17 @@
 
 :root {
   color-scheme: dark;
-  --font-inter: "Inter", system-ui, sans-serif;
-  --font-cormorant: "Cormorant Garamond", Georgia, serif;
-  /* Brand accent as RGB channels so Tailwind opacity modifiers (gold/15 etc.)
-     work AND Pro/War-Room mode can recolour the whole app by flipping these. */
-  --gold: 201 160 82;
-  --gold-soft: 224 196 136;
+  /* Official Alwalaa type trio (design-system): Marcellus display, Hanken body,
+     Tajawal for Arabic (bound to :lang(ar) below). */
+  --font-display: "Marcellus", Georgia, serif;
+  --font-body: "Hanken Grotesk", system-ui, sans-serif;
+  --font-ar: "Tajawal", "Hanken Grotesk", system-ui, sans-serif;
+
+  /* Brand accent (gold #D7A52C) + bronze #9C6B3B as RGB channels so Tailwind
+     opacity modifiers work AND Pro/War-Room mode can recolour the app. */
+  --gold: 215 165 44;
+  --gold-soft: 232 197 110;
+  --bronze: 156 107 59;
 }
 
 /* Pro / War-Room mode: the brand accent shifts gold -> crimson app-wide. */
@@ -21,9 +26,9 @@
 }
 
 body {
-  background-color: #1e1e1e;
-  color: #ffffff;
-  font-family: var(--font-inter), system-ui, sans-serif;
+  background-color: #151311; /* warm near-black — brand surface (dark) */
+  color: #fbf8f1; /* warm cream — brand primary text (dark) */
+  font-family: var(--font-body), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -31,8 +36,20 @@ h1,
 h2,
 h3,
 .font-heading {
-  font-family: var(--font-cormorant), Georgia, serif;
+  font-family: var(--font-display), Georgia, serif;
   letter-spacing: 0.01em;
+}
+
+/* Arabic: Tajawal for headings AND body, with taller leading (bound to lang). */
+:lang(ar) {
+  font-family: var(--font-ar), system-ui, sans-serif;
+  line-height: 1.85;
+}
+:lang(ar) h1,
+:lang(ar) h2,
+:lang(ar) h3,
+:lang(ar) .font-heading {
+  font-family: var(--font-ar), sans-serif;
 }
 
 ::selection {
