@@ -137,19 +137,3 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
-
-# Python / Streamlit / secrets
-__pycache__/
-*.pyc
-.env
-.streamlit/secrets.toml
-generated/
-
-# Next.js
-node_modules/
-.next/
-out/
-.vercel/
-.env.local
-.env*.local
-tsconfig.tsbuildinfo

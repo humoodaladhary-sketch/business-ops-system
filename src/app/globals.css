@@ -1,78 +1,76 @@
-@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Marcellus&family=Hanken+Grotesk:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap");
 
-@theme {
-  /* Alwalaa brand palette — black / gold / white */
-  --color-brand-black: #0A0A0A;
-  --color-brand-gold: #D4A017;
-  --color-brand-gold-soft: #E6B842;
-  --color-brand-white: #FFFFFF;
-  --color-brand-ivory: #FAF8F3;
-  --color-brand-gray-50: #F7F7F7;
-  --color-brand-gray-200: #E6E6E6;
-  --color-brand-gray-500: #737373;
-  --color-brand-gray-700: #2A2A2A;
-
-  --font-display: "Playfair Display", Georgia, serif;
-  --font-body: "Inter", system-ui, -apple-system, sans-serif;
-  --font-body-ar: "IBM Plex Sans Arabic", "Noto Sans Arabic", sans-serif;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
+  /* Official Alwalaa type trio (design-system): Marcellus display, Hanken body,
+     Tajawal for Arabic (bound to :lang(ar) below). */
+  --font-display: "Marcellus", Georgia, serif;
+  --font-body: "Hanken Grotesk", system-ui, sans-serif;
+  --font-ar: "Tajawal", "Hanken Grotesk", system-ui, sans-serif;
+
+  /* Brand accent (gold #D7A52C) + bronze #9C6B3B as RGB channels so Tailwind
+     opacity modifiers work AND Pro/War-Room mode can recolour the app. */
+  --gold: 215 165 44;
+  --gold-soft: 232 197 110;
+  --bronze: 156 107 59;
 }
 
-html, body {
-  background: var(--color-brand-ivory);
-  color: var(--color-brand-black);
-  font-family: var(--font-body);
-  font-feature-settings: "cv11", "ss01";
+/* Pro / War-Room mode: the brand accent shifts gold -> crimson app-wide. */
+:root[data-pro="on"] {
+  --gold: 229 72 77;
+  --gold-soft: 242 96 100;
 }
 
 body {
-  min-height: 100vh;
+  background-color: #151311; /* warm near-black — brand surface (dark) */
+  color: #fbf8f1; /* warm cream — brand primary text (dark) */
+  font-family: var(--font-body), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-[dir="rtl"], [lang="ar"] {
-  font-family: var(--font-body-ar);
+h1,
+h2,
+h3,
+.font-heading {
+  font-family: var(--font-display), Georgia, serif;
+  letter-spacing: 0.01em;
 }
 
-/* Brand utility classes */
-.brand-gradient {
-  background: linear-gradient(135deg, var(--color-brand-black) 0%, var(--color-brand-gray-700) 100%);
+/* Arabic: Tajawal for headings AND body, with taller leading (bound to lang). */
+:lang(ar) {
+  font-family: var(--font-ar), system-ui, sans-serif;
+  line-height: 1.85;
+}
+:lang(ar) h1,
+:lang(ar) h2,
+:lang(ar) h3,
+:lang(ar) .font-heading {
+  font-family: var(--font-ar), sans-serif;
 }
 
-.gold-underline {
-  border-bottom: 2px solid var(--color-brand-gold);
+::selection {
+  background: rgb(var(--gold) / 0.3);
 }
 
-.btn-primary {
-  @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-sm font-medium tracking-wide uppercase text-sm
-         bg-[var(--color-brand-black)] text-[var(--color-brand-white)]
-         hover:bg-[var(--color-brand-gray-700)] transition;
+/* Thin accent scrollbar (follows Pro-mode recolour) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--gold) / 0.35);
+  border-radius: 9999px;
 }
 
-.btn-gold {
-  @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-sm font-semibold tracking-wide uppercase text-sm
-         bg-[var(--color-brand-gold)] text-[var(--color-brand-black)]
-         hover:bg-[var(--color-brand-gold-soft)] transition;
+/* Print: drop the dark app background + chrome so the white report sheet
+   prints cleanly. App chrome is hidden via `print:hidden` classes. */
+@media print {
+  html, body { background: #ffffff !important; }
+  main { padding: 0 !important; max-width: none !important; }
+  .report-sheet { box-shadow: none !important; border-radius: 0 !important; max-width: none !important; }
+  @page { margin: 12mm; }
 }
-
-.btn-ghost {
-  @apply inline-flex items-center gap-2 px-4 py-2 rounded-sm text-sm
-         text-[var(--color-brand-gray-700)] hover:text-[var(--color-brand-black)]
-         hover:bg-[var(--color-brand-gray-50)] transition;
-}
-
-.card {
-  @apply bg-[var(--color-brand-white)] border border-[var(--color-brand-gray-200)] rounded-sm;
-}
-
-.badge {
-  @apply inline-flex items-center px-2 py-0.5 text-xs font-medium uppercase tracking-wider rounded-sm;
-}
-
-.badge-extracted { @apply bg-emerald-100 text-emerald-900; }
-.badge-inferred { @apply bg-amber-100 text-amber-900; }
-.badge-assumed { @apply bg-red-100 text-red-900; }
-.badge-missing { @apply bg-gray-100 text-gray-600; }
-.badge-gold { background: var(--color-brand-gold); color: var(--color-brand-black); }

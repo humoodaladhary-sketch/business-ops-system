@@ -1,0 +1,629 @@
+// Alwalaa Real Estate CRM — data model
+// Designed from the Phase 0 audit (docs/phase-0-data-audit.md) and the four
+// resolved decisions:
+//   1. Hybrid commission split: performance ladder + lead-source floor.
+//   2. Multi-agent deal attribution (co-brokered splits are first-class).
+//   3. Month attribution driven by Deal.closeDate ("Deal Closed On").
+//   4. Developer rate is tier-ready (quarterly volume) but seeded flat.
+//
+// Money is Decimal(18,3) — OMR has 3 decimal places (baisa). Rates are stored
+// as fractions in Decimal(6,4): 3.5% -> 0.0350, 50% -> 0.5000. No floats touch
+// commission math. Nothing about rates/tiers/thresholds is hardcoded — it all
+// lives in the config tables below.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  SENIOR
+  ADVISOR
+  NEW
+  TRAINEE
+  SALES_HEAD
+  MARKETING
+  FINANCE
+  LISTINGS
+  CEO
+}
+
+// Omni-channel lead capture source (C1).
+enum LeadChannel {
+  WHATSAPP
+  INSTAGRAM_DM
+  INSTAGRAM_COMMENT
+  INSTAGRAM_LEAD_AD
+  FACEBOOK_LEAD_AD
+  GOOGLE_LEAD_FORM
+  WEBSITE
+  PORTAL_FEED
+  REFERRAL
+  WALKIN
+  MANUAL
+  IMPORT
+}
+
+enum ScoreBand {
+  HOT
+  WARM
+  COLD
+}
+
+enum CommChannel {
+  WHATSAPP
+  EMAIL
+  CALL
+  SMS
+  INSTAGRAM
+  SYSTEM
+  NOTE
+}
+
+enum CommDirection {
+  INBOUND
+  OUTBOUND
+  SYSTEM
+}
+
+enum CallOutcome {
+  CONNECTED
+  NO_ANSWER
+  BUSY
+  WRONG_NUMBER
+}
+
+enum UnitMarket {
+  OFF_PLAN
+  SECONDARY
+}
+
+enum UnitStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+  OFF_MARKET
+}
+
+enum Segment {
+  DIASPORA
+  RESIDENT
+  NA
+}
+
+enum AgentStatus {
+  ACTIVE
+  PROBATION
+  INACTIVE
+}
+
+enum LeadSource {
+  ALWALAA_SOURCED
+  AGENT_NETWORK
+}
+
+// The one canonical pipeline. ALL source labels normalize to these.
+enum CanonicalStage {
+  NEW
+  QUALIFIED
+  ENGAGED
+  VIEWING
+  NEGOTIATION
+  RESERVATION
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+enum AttributionRole {
+  PRIMARY
+  CO_BROKER
+  REFERRER
+}
+
+enum SnapshotStatus {
+  PROVISIONAL
+  FINAL
+}
+
+enum PaidStatus {
+  UNPAID
+  INVOICED
+  RECEIVED
+  PAID
+}
+
+enum RewardType {
+  AGENT_OF_MONTH
+  OVERACHIEVER_BONUS
+  STREAK_BONUS
+}
+
+enum TargetSource {
+  ROLE_DEFAULT
+  CUSTOM
+}
+
+enum ReviewStatus {
+  OPEN
+  ACKNOWLEDGED
+  CLOSED
+}
+
+enum IngestSource {
+  CSV
+  GOOGLE_SHEETS
+  FORM
+}
+
+// Lead-routing state for the 10-minute basket.
+enum AssignmentStatus {
+  UNCLAIMED
+  ASSIGNED
+  CLAIMED
+  REASSIGNED
+}
+
+// ---------------------------------------------------------------------------
+// People & inventory
+// ---------------------------------------------------------------------------
+
+model Agent {
+  id                String       @id @default(cuid())
+  name              String
+  email             String?      @unique
+  role              Role
+  segment           Segment      @default(NA)
+  status            AgentStatus  @default(ACTIVE)
+  // New-agent contract: first closed deal activates a 1-year contract.
+  contractTriggered Boolean      @default(false)
+  contractStartDate DateTime?
+  // Ramp window: while now < rampEndDate the agent is exempt from at-risk.
+  rampEndDate       DateTime?
+  // Trainees are exempt from at-risk regardless of ramp.
+  exemptFromAtRisk  Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  targets       Target[]
+  attributions  DealAttribution[]
+  snapshots     MonthlyPerformanceSnapshot[]
+  rewards       Reward[]
+  leads         Lead[]
+  atRiskReviews AtRiskReview[]
+  stageMappings StageMapping[]
+
+  @@index([role])
+  @@index([status])
+}
+
+model Developer {
+  id              String                    @id @default(cuid())
+  name            String                    @unique
+  canonicalKey    String                    @unique
+  paymentReliable Boolean                   @default(true)
+  notes           String?
+  createdAt       DateTime                  @default(now())
+  rules           DeveloperCommissionRule[]
+  projects        Project[]
+  deals           Deal[]
+  aliases         DeveloperAlias[]
+}
+
+model Project {
+  id           String   @id @default(cuid())
+  name         String
+  developerId  String
+  developer    Developer @relation(fields: [developerId], references: [id])
+  location     String?
+  priorityRank Int       @default(999)
+  signed       Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+
+  deals         Deal[]
+  leadsInterest Lead[]
+  aliases       ProjectAlias[]
+
+  @@unique([developerId, name])
+  @@index([priorityRank])
+}
+
+// ---------------------------------------------------------------------------
+// Leads & deals
+// ---------------------------------------------------------------------------
+
+model Lead {
+  id              String         @id @default(cuid())
+  name            String
+  title           String?
+  contact         String?
+  email           String?
+  source          LeadSource     @default(ALWALAA_SOURCED)
+  segment         Segment        @default(NA)
+  assignedAgentId String?
+  assignedAgent   Agent?         @relation(fields: [assignedAgentId], references: [id])
+  canonicalStage  CanonicalStage @default(NEW)
+  // Audit only — never used by the engine. Raw source label kept for trace.
+  rawStageLabel   String?
+  projectInterestId String?
+  projectInterest Project?       @relation(fields: [projectInterestId], references: [id])
+  nationality       String?
+  countryOfResidence String?
+  budgetBand      String?
+  purpose         String?
+  timeline        String?
+  language        String?
+  currency        String?
+  notes           String?
+  registeredAt    DateTime?
+  lastFollowUpAt  DateTime?
+  stagingRowId    String?
+  // 10-minute basket routing (see /portal). claimExpiresAt = assignedAt + 10m.
+  assignmentStatus AssignmentStatus @default(UNCLAIMED)
+  assignedAt       DateTime?
+  claimExpiresAt   DateTime?
+  // Omni-channel capture + scoring (C1/C2)
+  clientId        String?
+  client          Client?        @relation(fields: [clientId], references: [id])
+  channel         LeadChannel?
+  sourceRef       String?
+  utm             Json?
+  rawPayload      Json?
+  score           Int            @default(0)
+  scoreBand       ScoreBand?
+  touchCount      Int            @default(0)
+  firstResponseAt DateTime?
+  lastInboundAt   DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  deals Deal[]
+  comms CommunicationLog[]
+
+  @@index([canonicalStage])
+  @@index([assignedAgentId])
+  @@index([source])
+  @@index([assignmentStatus])
+  @@index([clientId])
+  @@index([scoreBand])
+}
+
+model Deal {
+  id             String         @id @default(cuid())
+  leadId         String?
+  lead           Lead?          @relation(fields: [leadId], references: [id])
+  developerId    String
+  developer      Developer      @relation(fields: [developerId], references: [id])
+  projectId      String
+  project        Project        @relation(fields: [projectId], references: [id])
+  dealValue      Decimal        @db.Decimal(18, 3) // OMR, excl. VAT, per SPA
+  canonicalStage CanonicalStage @default(RESERVATION)
+  clientName     String?
+  unitType       String?
+  unitNumber     String?
+  // Reservation kept for funnel analytics; closeDate drives the month (Decision 3).
+  reservationDate DateTime?
+  closeDate      DateTime?
+  notes          String?
+  stagingRowId   String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  attributions DealAttribution[]
+  commissions  Commission[]
+
+  @@index([closeDate])
+  @@index([developerId])
+  @@index([canonicalStage])
+}
+
+// Decision 2 — a deal can credit several agents. Shares sum to 1.0.
+model DealAttribution {
+  id        String          @id @default(cuid())
+  dealId    String
+  deal      Deal            @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  agentId   String
+  agent     Agent           @relation(fields: [agentId], references: [id])
+  sharePct  Decimal         @db.Decimal(6, 4) // fraction of the deal credited to this agent
+  role      AttributionRole @default(PRIMARY)
+  createdAt DateTime        @default(now())
+
+  commission Commission?
+
+  @@unique([dealId, agentId])
+  @@index([agentId])
+}
+
+// ---------------------------------------------------------------------------
+// Targets & commission configuration (all editable — never hardcoded)
+// ---------------------------------------------------------------------------
+
+model Target {
+  id           String       @id @default(cuid())
+  agentId      String
+  agent        Agent        @relation(fields: [agentId], references: [id])
+  period       String // 'YYYY-MM'
+  targetAmount Decimal      @db.Decimal(18, 3)
+  source       TargetSource @default(ROLE_DEFAULT)
+
+  @@unique([agentId, period])
+}
+
+// The 25/35/40/50 ladder. agentSplitRate resolved from whole-month % of target.
+model CommissionLadder {
+  id             String   @id @default(cuid())
+  tierName       String   @unique
+  minPctOfTarget Decimal  @db.Decimal(7, 4) // inclusive, fraction (0.50 = 50%)
+  maxPctOfTarget Decimal? @db.Decimal(7, 4) // exclusive; null = open-ended top tier
+  agentSplitRate Decimal  @db.Decimal(6, 4) // fraction (0.50 = 50%)
+  sortOrder      Int
+
+  @@index([sortOrder])
+}
+
+// Decision 1 — hybrid floor. Own/referral leads never fall below their floor.
+model LeadSourceFloor {
+  id             String     @id @default(cuid())
+  source         LeadSource @unique
+  floorSplitRate Decimal    @db.Decimal(6, 4) // fraction; 0 = no floor (ladder only)
+  note           String?
+}
+
+// Decision 4 — tier-ready by cumulative quarterly volume; seeded as one flat row.
+model DeveloperCommissionRule {
+  id                String    @id @default(cuid())
+  developerId       String
+  developer         Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+  tierName          String?
+  minQuarterlyVolume Decimal  @db.Decimal(18, 3) @default(0)
+  maxQuarterlyVolume Decimal? @db.Decimal(18, 3)
+  rate              Decimal   @db.Decimal(6, 4) // developer -> Alwalaa, fraction
+
+  @@unique([developerId, minQuarterlyVolume])
+}
+
+// ---------------------------------------------------------------------------
+// Computed outputs
+// ---------------------------------------------------------------------------
+
+model MonthlyPerformanceSnapshot {
+  id              String         @id @default(cuid())
+  agentId         String
+  agent           Agent          @relation(fields: [agentId], references: [id])
+  period          String // 'YYYY-MM'
+  volumeClosed    Decimal        @db.Decimal(18, 3)
+  targetAmount    Decimal        @db.Decimal(18, 3)
+  pctOfTarget     Decimal        @db.Decimal(7, 4)
+  currentTier     String
+  currentSplitRate Decimal       @db.Decimal(6, 4)
+  projectedPayout Decimal        @db.Decimal(18, 3)
+  finalPayout     Decimal?       @db.Decimal(18, 3)
+  status          SnapshotStatus @default(PROVISIONAL)
+  dealCount       Int            @default(0)
+  watchFlag       Boolean        @default(false)
+  atRiskFlag      Boolean        @default(false)
+  computedAt      DateTime       @default(now())
+
+  @@unique([agentId, period])
+  @@index([period])
+}
+
+model Commission {
+  id                String          @id @default(cuid())
+  dealId            String
+  deal              Deal            @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  attributionId     String          @unique
+  attribution       DealAttribution @relation(fields: [attributionId], references: [id], onDelete: Cascade)
+  developerRate     Decimal         @db.Decimal(6, 4)
+  alwalaaGross      Decimal         @db.Decimal(18, 3) // dealValue*share*developerRate
+  agentSplitRate    Decimal         @db.Decimal(6, 4)
+  agentPayout       Decimal         @db.Decimal(18, 3) // alwalaaGross*agentSplitRate
+  developerPaid     PaidStatus      @default(UNPAID)
+  agentPaid         PaidStatus      @default(UNPAID)
+  paidDate          DateTime?
+  attributionReason String // raw lead-source reason, for audit/override
+  overrideNote      String?
+  computedAt        DateTime        @default(now())
+
+  @@index([dealId])
+}
+
+model Reward {
+  id        String     @id @default(cuid())
+  agentId   String
+  agent     Agent      @relation(fields: [agentId], references: [id])
+  period    String
+  type      RewardType
+  amount    Decimal    @db.Decimal(18, 3) @default(0)
+  note      String?
+  createdAt DateTime   @default(now())
+
+  @@unique([agentId, period, type])
+}
+
+model AtRiskReview {
+  id         String       @id @default(cuid())
+  agentId    String
+  agent      Agent        @relation(fields: [agentId], references: [id])
+  period     String
+  reason     String
+  assignedTo String       @default("CEO")
+  status     ReviewStatus @default(OPEN)
+  createdAt  DateTime     @default(now())
+  resolvedAt DateTime?
+
+  @@unique([agentId, period])
+}
+
+// ---------------------------------------------------------------------------
+// Normalization dictionaries (seeded from the Phase 0 audit)
+// ---------------------------------------------------------------------------
+
+model StageMapping {
+  id             String         @id @default(cuid())
+  sourceLabel    String
+  canonicalStage CanonicalStage
+  // Null agentId = global mapping; set = per-agent override.
+  agentId        String?
+  agent          Agent?         @relation(fields: [agentId], references: [id])
+  note           String?
+
+  @@unique([sourceLabel, agentId])
+}
+
+model DeveloperAlias {
+  id          String    @id @default(cuid())
+  alias       String    @unique // normalized lowercase source string
+  developerId String
+  developer   Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+}
+
+model ProjectAlias {
+  id        String  @id @default(cuid())
+  alias     String  @unique
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// Ingestion staging — APPEND ONLY. Never updated or deleted by app code.
+// ---------------------------------------------------------------------------
+
+model StagingBatch {
+  id         String       @id @default(cuid())
+  source     IngestSource
+  sourceRef  String? // file name, sheet id, or form id
+  agentName  String?
+  uploadedAt DateTime     @default(now())
+  rowCount   Int          @default(0)
+
+  rows   StagingRow[]
+  errors IngestionError[]
+}
+
+model StagingRow {
+  id        String       @id @default(cuid())
+  batchId   String
+  batch     StagingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rowIndex  Int
+  sheetTab  String?
+  raw       Json
+  createdAt DateTime     @default(now())
+
+  @@index([batchId])
+}
+
+model IngestionError {
+  id        String       @id @default(cuid())
+  batchId   String
+  batch     StagingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rowIndex  Int
+  raw       Json
+  errors    Json
+  createdAt DateTime     @default(now())
+
+  @@index([batchId])
+}
+
+// ---------------------------------------------------------------------------
+// CRM foundations (Phase 0): Client, communications, inventory, settings, audit
+// ---------------------------------------------------------------------------
+
+// A person/buyer — leads dedup onto a Client by E.164 phone. PII lives here and
+// is access-controlled by RLS; never put it in URLs/logs.
+model Client {
+  id              String   @id @default(cuid())
+  name            String
+  primaryPhone    String   @unique // E.164
+  email           String?
+  country         String? // ISO-3166 alpha-2
+  language        String?
+  optOutWhatsapp  Boolean  @default(false)
+  optOutEmail     Boolean  @default(false)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  leads Lead[]
+}
+
+// Every touch — inbound/outbound — across channels. Central to C1/C4/C7.
+model CommunicationLog {
+  id          String        @id @default(cuid())
+  leadId      String?
+  lead        Lead?         @relation(fields: [leadId], references: [id])
+  clientId    String?
+  agentId     String?
+  dealId      String?
+  channel     CommChannel
+  direction   CommDirection
+  templateRef String? // approved WhatsApp template id (compliance)
+  body        String?
+  outcome     CallOutcome?
+  durationSec Int?
+  occurredAt  DateTime      @default(now())
+  meta        Json?
+  createdAt   DateTime      @default(now())
+
+  @@index([leadId])
+  @@index([agentId])
+  @@index([occurredAt])
+}
+
+// Inventory unit (off-plan or secondary). Soft references to project/developer
+// by id keep this decoupled. Drives C5 matching and the C9 feed.
+model Unit {
+  id           String     @id @default(cuid())
+  projectId    String?
+  developerId  String?
+  market       UnitMarket
+  unitType     String
+  unitNumber   String?
+  bedrooms     Int?
+  sizeSqm      Decimal?   @db.Decimal(10, 2)
+  priceOMR     Decimal?   @db.Decimal(18, 3)
+  status       UnitStatus @default(AVAILABLE)
+  residencyTier String?
+  published    Boolean    @default(false)
+  attributes   Json?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([projectId])
+  @@index([status])
+  @@index([published])
+}
+
+// Editable configuration (scoring weights, assignment rules, forecast probs,
+// matching weights, webhook registry, sequences) — no deploy needed.
+model Setting {
+  key       String   @id
+  value     Json
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+// Every mutation writes here (task requirement). Append-only.
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actorRole String?
+  action    String // e.g. lead.created, lead.assigned, deal.closed
+  entity    String
+  entityId  String?
+  before    Json?
+  after     Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}

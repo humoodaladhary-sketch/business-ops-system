@@ -1,42 +1,56 @@
-/**
- * GET /api/inventory
- *
- * Returns all stored units. Optional query params for lightweight filtering
- * so N8N / WhatsApp can pull slices:
- *   ?project=  ?unitType=  ?status=  ?itc=1  ?maxPrice=  ?minPrice=
- */
-
 import { NextRequest, NextResponse } from "next/server";
-import { getInventoryRepository } from "@/storage/inventory";
-import type { Unit } from "@/domain/inventory/unit";
+import { z } from "zod";
+import { getSession } from "@/infrastructure/auth/session";
+import { canManageInventory } from "@/domain";
+import { getUnits, upsertUnit } from "@/app/_data/runtimeConfig";
+import { hasDatabase, prisma } from "@/infrastructure/prisma/client";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
-  try {
-    const repo = getInventoryRepository();
-    let units = await repo.getAll();
-    const sp = req.nextUrl.searchParams;
+const Unit = z.object({
+  id: z.string().optional(),
+  project: z.string().min(1),
+  developer: z.string().min(1),
+  unitType: z.string().min(1),
+  bedrooms: z.number().int().min(0).max(12).nullable(),
+  priceOMR: z.number().min(1),
+  status: z.enum(["AVAILABLE", "RESERVED", "SOLD"]).default("AVAILABLE"),
+  published: z.boolean().default(false),
+});
 
-    const project = sp.get("project");
-    const unitType = sp.get("unitType");
-    const status = sp.get("status");
-    const itc = sp.get("itc");
-    const minPrice = sp.get("minPrice");
-    const maxPrice = sp.get("maxPrice");
+export async function GET() {
+  const s = await getSession();
+  if (!s) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  return NextResponse.json({ ok: true, units: getUnits() });
+}
 
-    units = units.filter((u: Unit) => {
-      if (project && u.project !== project) return false;
-      if (unitType && u.unitType !== unitType) return false;
-      if (status && u.status !== status) return false;
-      if (itc === "1" && !u.itcEligible) return false;
-      if (minPrice && (u.priceOMR == null || u.priceOMR < Number(minPrice))) return false;
-      if (maxPrice && (u.priceOMR == null || u.priceOMR > Number(maxPrice))) return false;
-      return true;
-    });
-
-    return NextResponse.json({ ok: true, count: units.length, units });
-  } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+export async function POST(req: NextRequest) {
+  const s = await getSession();
+  if (!s || !canManageInventory(s.role === "ADMIN" ? "ADMIN" : "ADVISOR")) {
+    return NextResponse.json({ error: "Only admins can manage inventory." }, { status: 403 });
   }
+  const parsed = Unit.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid unit." }, { status: 400 });
+  }
+  const u = parsed.data;
+  const unit = { ...u, id: u.id ?? `u-${Date.now().toString(36)}`, bedrooms: u.bedrooms ?? null };
+  upsertUnit(unit);
+
+  if (hasDatabase) {
+    try {
+      await prisma.unit.upsert({
+        where: { id: unit.id },
+        update: { unitType: unit.unitType, bedrooms: unit.bedrooms, priceOMR: unit.priceOMR, status: unit.status, published: unit.published },
+        create: { id: unit.id, market: "OFF_PLAN", unitType: unit.unitType, bedrooms: unit.bedrooms, priceOMR: unit.priceOMR, status: unit.status, published: unit.published, attributes: { project: unit.project, developer: unit.developer } },
+      });
+      await prisma.auditLog.create({
+        data: { actorId: s.userId, actorRole: s.role, action: "unit.upserted", entity: "Unit", entityId: unit.id, after: unit as never },
+      });
+    } catch {
+      /* in-memory copy already applied */
+    }
+  }
+  return NextResponse.json({ ok: true, units: getUnits(), persisted: hasDatabase });
 }
