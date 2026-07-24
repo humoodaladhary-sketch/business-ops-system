@@ -2,6 +2,8 @@
 
 import { useRef, useState } from "react";
 import { Send, Loader2, Sparkles } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Msg {
   role: "user" | "assistant";
@@ -84,9 +86,15 @@ export function Copilot({ department, starters }: { department: string; starters
         )}
         {messages.map((m, i) => (
           <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-            <div className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm ${m.role === "user" ? "bg-gold text-ink" : "border border-hairline bg-ink-900/50 text-white/85"}`}>
-              {m.content}
-            </div>
+            {m.role === "user" ? (
+              <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-gold px-4 py-2.5 text-sm text-ink">
+                {m.content}
+              </div>
+            ) : (
+              <div className="max-w-[92%] rounded-2xl border border-hairline bg-ink-900/50 px-4 py-3 text-sm text-white/85">
+                <AgentMarkdown>{m.content}</AgentMarkdown>
+              </div>
+            )}
           </div>
         ))}
         {busy && (
@@ -110,6 +118,35 @@ export function Copilot({ department, starters }: { department: string; starters
           <Send className="h-4 w-4" />
         </button>
       </form>
+    </div>
+  );
+}
+
+// Renders the agent's markdown reply — tables scroll on mobile, gold-accented.
+// Styled via arbitrary variants (no custom components → no node-prop pitfalls).
+function AgentMarkdown({ children }: { children: string }) {
+  return (
+    <div
+      className={
+        "space-y-2 leading-relaxed " +
+        "[&_p]:my-1.5 " +
+        "[&_h1]:mb-1 [&_h1]:mt-2 [&_h1]:font-heading [&_h1]:text-base [&_h1]:text-white " +
+        "[&_h2]:mb-1 [&_h2]:mt-2 [&_h2]:font-heading [&_h2]:text-base [&_h2]:text-white " +
+        "[&_h3]:mb-1 [&_h3]:mt-2 [&_h3]:font-semibold [&_h3]:text-white " +
+        "[&_ul]:my-1.5 [&_ul]:ml-4 [&_ul]:list-disc [&_ul]:space-y-1 " +
+        "[&_ol]:my-1.5 [&_ol]:ml-4 [&_ol]:list-decimal [&_ol]:space-y-1 " +
+        "[&_li]:marker:text-gold/60 " +
+        "[&_strong]:font-semibold [&_strong]:text-white " +
+        "[&_a]:text-gold [&_a]:underline " +
+        "[&_code]:rounded [&_code]:bg-ink [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-gold " +
+        "[&_hr]:my-3 [&_hr]:border-hairline " +
+        "[&_blockquote]:border-l-2 [&_blockquote]:border-gold/40 [&_blockquote]:pl-3 [&_blockquote]:text-white/70 " +
+        "[&_table]:my-2 [&_table]:block [&_table]:w-full [&_table]:overflow-x-auto [&_table]:border-collapse [&_table]:text-xs " +
+        "[&_th]:whitespace-nowrap [&_th]:border [&_th]:border-hairline [&_th]:bg-ink-900/60 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-white/60 " +
+        "[&_td]:border [&_td]:border-white/5 [&_td]:px-3 [&_td]:py-1.5 [&_td]:align-top [&_td]:text-white/85"
+      }
+    >
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
     </div>
   );
 }
