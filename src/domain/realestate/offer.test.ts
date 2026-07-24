@@ -95,8 +95,8 @@ describe("reservation offer", () => {
     expect(buildOffer(baseInput({ closingToday: true })).reservationOffer.applies).toBe(false);
     expect(buildOffer(baseInput({ reservationOffer: true })).reservationOffer.applies).toBe(false);
     expect(buildOffer(baseInput()).reservationOffer.applies).toBe(false);
-    // no reservation folded into the plan
-    expect(buildOffer(baseInput({ closingToday: true })).paymentPlan.reservationOmr).toBe(0);
+    // standard 5% reservation still applies (the 500 promo needs BOTH flags)
+    expect(buildOffer(baseInput({ closingToday: true })).paymentPlan.reservationOmr).toBe(12000);
   });
 });
 

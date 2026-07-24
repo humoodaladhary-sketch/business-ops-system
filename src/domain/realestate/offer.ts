@@ -9,6 +9,7 @@ import {
   type PaymentPlanResult,
   type ResidencyTierResult,
 } from "./calculators";
+import { termsForDeveloper } from "./developer-terms";
 import { roundOMR, d } from "../money";
 
 // ---------------------------------------------------------------------------
@@ -146,16 +147,25 @@ export function buildOffer(input: OfferInput): Offer {
   const reservationApplies = Boolean(input.closingToday && input.reservationOffer);
   const RESERVATION_AMOUNT_OMR = 500;
 
+  // Payment terms follow the developer (Alwalaa standard 5% reservation / 15%
+  // down / 5 years quarterly by default). The reserve-today promo replaces the
+  // standard reservation with a flat 500 OMR to secure the unit.
+  const terms = termsForDeveloper(unit.developer);
   const plan = paymentPlan({
     priceOmr: unit.priceOmr,
-    reservationOmr: reservationApplies ? RESERVATION_AMOUNT_OMR : 0,
+    downPct: terms.downPct,
+    years: terms.years,
+    installmentsPerYear: terms.installmentsPerYear,
+    ...(reservationApplies
+      ? { reservationOmr: RESERVATION_AMOUNT_OMR }
+      : { reservationPct: terms.reservationPct }),
   });
 
   const residency = residencyTier({ priceOmr: unit.priceOmr });
 
   const assumptions = [
     "Prices are in Omani Rial (OMR); 1 m² pricing shown for comparison.",
-    "The payment plan is indicative and subject to the developer's final terms.",
+    `The standard plan is ${Math.round(terms.reservationPct * 100)}% reservation, ${Math.round(terms.downPct * 100)}% down and the balance over ${terms.years} years (quarterly) — indicative and subject to the developer's final terms.`,
     "Residency eligibility is guidance only — final approval rests with the Royal Oman Police.",
     "Any USD figures use an indicative pegged rate of 1 OMR = 2.60 USD.",
     "Offer is subject to unit availability and developer confirmation at signing.",

@@ -44,14 +44,15 @@ describe("capitalAppreciation", () => {
 });
 
 describe("paymentPlan", () => {
-  it("reservation + down + all instalments sum EXACTLY to price (uneven split)", () => {
-    // 100000, 15% down = 15000, balance 85000 over 12 quarters => 7083.333.. remainder absorbed
+  it("reservation (5%) + down (15%) + all instalments sum EXACTLY to price (uneven split)", () => {
+    // 100000: 5% reservation = 5000, 15% down = 15000, balance 80000 over 12
+    // quarters => 6666.667, remainder absorbed by the final instalment.
     const p = paymentPlan({ priceOmr: 100000, years: 3, installmentsPerYear: 4 });
-    expect(p.reservationOmr).toBe(0);
+    expect(p.reservationOmr).toBe(5000);
     expect(p.downOmr).toBe(15000);
-    expect(p.balanceOmr).toBe(85000);
+    expect(p.balanceOmr).toBe(80000);
     expect(p.installmentsCount).toBe(12);
-    expect(p.installmentOmr).toBe(7083.333);
+    expect(p.installmentOmr).toBe(6666.667);
 
     const installments = p.schedule.filter((s) => s.label.startsWith("Installment"));
     const installmentSum = installments.reduce((acc, s) => acc + s.amountOmr, 0);
@@ -67,6 +68,7 @@ describe("paymentPlan", () => {
 
   it("applies defaults (15% down, 5y, quarterly => 20 instalments) and reconciles", () => {
     const p = paymentPlan({ priceOmr: 250000 });
+    expect(p.reservationOmr).toBe(12500); // standard 5%
     expect(p.downOmr).toBe(37500);
     expect(p.installmentsCount).toBe(20);
     const scheduleTotal =

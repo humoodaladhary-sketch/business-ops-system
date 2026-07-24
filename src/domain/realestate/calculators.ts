@@ -119,8 +119,10 @@ export function capitalAppreciation(input: CapitalAppreciationInput): CapitalApp
 export interface PaymentPlanInput {
   /** Purchase price in OMR. */
   priceOmr: number;
-  /** Reservation deposit in OMR paid up front. Default 0. */
+  /** Reservation deposit in OMR paid up front. Overrides reservationPct when set (e.g. a 500 OMR reserve-today promo). */
   reservationOmr?: number;
+  /** Reservation as a FRACTION of price (0.05 = 5%) — the Alwalaa standard. Used when reservationOmr is not set. Default 0.05. */
+  reservationPct?: number;
   /** Down payment as a FRACTION of price (0.15 = 15%). Default 0.15. */
   downPct?: number;
   /** Number of years the balance is spread over. Default 5. */
@@ -166,13 +168,18 @@ export interface PaymentPlanResult {
 export function paymentPlan(input: PaymentPlanInput): PaymentPlanResult {
   const {
     priceOmr,
-    reservationOmr: reservationInput = 0,
+    reservationOmr: reservationInput,
+    reservationPct = 0.05,
     downPct = 0.15,
     years = 5,
     installmentsPerYear = 4,
   } = input;
 
-  const reservationOmr = roundOMR(reservationInput);
+  // Reservation defaults to the standard 5% of price; an explicit OMR amount
+  // (e.g. a 500 OMR reserve-today promo) overrides it.
+  const reservationOmr = roundOMR(
+    reservationInput !== undefined ? reservationInput : d(priceOmr).times(reservationPct),
+  );
   const downOmr = roundOMR(d(priceOmr).times(downPct));
   const balanceOmr = roundOMR(d(priceOmr).minus(reservationOmr).minus(downOmr));
 
