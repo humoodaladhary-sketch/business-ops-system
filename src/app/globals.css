@@ -8,6 +8,16 @@
   color-scheme: dark;
   --font-inter: "Inter", system-ui, sans-serif;
   --font-cormorant: "Cormorant Garamond", Georgia, serif;
+  /* Brand accent as RGB channels so Tailwind opacity modifiers (gold/15 etc.)
+     work AND Pro/War-Room mode can recolour the whole app by flipping these. */
+  --gold: 201 160 82;
+  --gold-soft: 224 196 136;
+}
+
+/* Pro / War-Room mode: the brand accent shifts gold -> crimson app-wide. */
+:root[data-pro="on"] {
+  --gold: 229 72 77;
+  --gold-soft: 242 96 100;
 }
 
 body {
@@ -26,16 +36,16 @@ h3,
 }
 
 ::selection {
-  background: rgba(201, 160, 82, 0.3);
+  background: rgb(var(--gold) / 0.3);
 }
 
-/* Thin gold scrollbar */
+/* Thin accent scrollbar (follows Pro-mode recolour) */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(201, 160, 82, 0.35);
+  background: rgb(var(--gold) / 0.35);
   border-radius: 9999px;
 }
 

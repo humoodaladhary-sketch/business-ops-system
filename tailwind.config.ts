@@ -16,9 +16,11 @@ const config: Config = {
           100: "#242424",
           900: "#171717",
         },
+        // Var-driven so Pro/War-Room mode recolours the whole app (gold -> crimson).
+        // RGB-channel form keeps Tailwind opacity modifiers (gold/15) working.
         gold: {
-          DEFAULT: "#C9A052",
-          soft: "#E0C488",
+          DEFAULT: "rgb(var(--gold) / <alpha-value>)",
+          soft: "rgb(var(--gold-soft) / <alpha-value>)",
           deep: "#A07F35",
         },
         // Semantic tier colors for the commission ladder.
@@ -35,7 +37,7 @@ const config: Config = {
         body: ["var(--font-inter)", "system-ui", "sans-serif"],
       },
       borderColor: {
-        hairline: "rgba(201,160,82,0.18)",
+        hairline: "rgb(var(--gold) / 0.18)",
       },
     },
   },

@@ -7,12 +7,14 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, GitBranch, FileSignature, TrendingUp, BarChart3,
   Trophy, UsersRound, Inbox, ShieldCheck, X, LogOut, Building2, Settings,
-  FileText, Network, LayoutGrid,
+  FileText, Network, LayoutGrid, Swords,
 } from "lucide-react";
 import { cn } from "../lib/cn";
+import { ProToggle, WarRoomBadge, useProMode } from "./ProMode";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/": LayoutDashboard,
+  "/war-room": Swords,
   "/departments": Network,
   "/leads": Users,
   "/pipeline": GitBranch,
@@ -31,6 +33,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
 // Short labels + the four primary destinations for the mobile bottom bar.
 const SHORT: Record<string, string> = {
   "/": "Home",
+  "/war-room": "War Room",
   "/departments": "Copilots",
   "/leads": "Leads",
   "/inventory": "Inventory",
@@ -57,12 +60,15 @@ export function Shell({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
+  const { pro } = useProMode();
 
   if (!user) return <main className="min-h-screen">{children}</main>;
 
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const roleLabel = user.role === "ADMIN" ? "CEO · Owner" : "Advisor";
-  const primaryLinks = PRIMARY.map((h) => links.find((l) => l.href === h)).filter(Boolean) as { href: string; label: string }[];
+  // In War Room, the first bottom-nav slot becomes the War Room itself.
+  const primaryHrefs = pro ? ["/war-room", "/departments", "/leads", "/inventory"] : PRIMARY;
+  const primaryLinks = primaryHrefs.map((h) => links.find((l) => l.href === h)).filter(Boolean) as { href: string; label: string }[];
 
   return (
     <div className="min-h-screen md:flex">
@@ -113,10 +119,13 @@ export function Shell({
 
       {/* ---------------- Content column ---------------- */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Mobile top bar */}
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-hairline bg-ink-900/90 px-4 py-3 backdrop-blur md:hidden print:hidden">
-          <Image src="/alwalaa-logo-white.png" alt="Alwalaa Real Estate" width={80} height={80} priority className="h-8 w-auto" />
-          <span className="ml-auto text-[10px] uppercase tracking-[0.2em] text-gold/70">{roleLabel}</span>
+        {/* Top command bar — logo on mobile, Pro/War-Room switch top-right (all sizes) */}
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-hairline bg-ink-900/90 px-4 py-3 backdrop-blur print:hidden md:px-8">
+          <Image src="/alwalaa-logo-white.png" alt="Alwalaa Real Estate" width={80} height={80} priority className="h-8 w-auto md:hidden" />
+          <div className="ml-auto flex items-center gap-2">
+            <WarRoomBadge />
+            <ProToggle />
+          </div>
         </header>
 
         <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 pb-28 md:px-8 md:py-7 md:pb-10">{children}</main>
