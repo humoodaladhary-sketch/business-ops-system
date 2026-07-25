@@ -4,6 +4,9 @@ import { StatTile } from "../components/ui";
 import { LeadsTable } from "./LeadsTable";
 import { requireSession, isAdmin } from "@/infrastructure/auth/session";
 
+// Business data must be read at request time, never frozen into the build.
+export const dynamic = "force-dynamic";
+
 export const metadata = { title: "Leads · Alwalaa CRM" };
 
 export default async function LeadsPage() {

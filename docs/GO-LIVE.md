@@ -130,3 +130,31 @@ WhatsApp (Respond.io). The at-risk endpoint is `/api/webhooks/at-risk`.
   every page; falls back to the snapshot when the DB is empty/unreachable.
 - **Auth:** `src/infrastructure/auth` — Supabase when `AUTH_PROVIDER=supabase`,
   else the demo login. RLS in `supabase/migrations`.
+
+## E. CRM to Supabase (live dashboards) — July 2026
+
+The dashboards (Command Center, Performance, Analytics, Leaderboard, Reports,
+Commissions, Leads, Deals, Pipeline) now read **Supabase first** via
+`src/app/_data/live.ts` → `loadData()`. Finance KPIs (invoiced / collected /
+outstanding / overdue) come straight from the Zoho-synced `invoices` and
+`collections` tables — the same numbers the Finance copilot quotes.
+
+**Truth rule:** only `deals`/`leads` rows with an `external_id` (Zoho sync,
+Drive seed) are treated as business data. Hand-inserted demo rows have no
+`external_id` and are ignored, so fabricated numbers can never surface.
+
+One-time activation (in order):
+
+1. Apply migration `supabase/migrations/0008_crm_live_dashboards.up.sql`
+   (additive; reversible via the matching `.down.sql`).
+2. Run `supabase/seeds/crm_seed.sql` (SQL editor or
+   `psql "$DATABASE_URL" -f supabase/seeds/crm_seed.sql`). It is idempotent:
+   upserts the 8 team staff profiles, **deletes demo deals/leads (rows with no
+   external_id)**, and upserts the real Drive CRM history (30 deals, 24 leads)
+   keyed on `(organization_id, external_id)`.
+   Regenerate after editing the snapshot: `pnpm seed:crm:build`.
+3. Vercel env needs `SUPABASE_SERVICE_ROLE_KEY` (already set for the copilots).
+
+Until the seed runs, screens fall back to the baked snapshot and the header
+badge reads “Snapshot · not live”; after it runs the badge flips to
+“Live · Supabase”.

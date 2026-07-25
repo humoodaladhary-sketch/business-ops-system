@@ -4,6 +4,9 @@ import { PipelineBoard } from "../components/PipelineBoard";
 import { SectionTitle, StatTile, Card } from "../components/ui";
 import { formatPct } from "../lib/format";
 
+// Business data must be read at request time, never frozen into the build.
+export const dynamic = "force-dynamic";
+
 export default async function PipelinePage() {
   const counts = getPipeline(await loadData());
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
