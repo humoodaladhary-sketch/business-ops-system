@@ -5,6 +5,7 @@ import {
   Megaphone, Sparkles, Swords, TrendingUp, Users, Wallet,
 } from "lucide-react";
 import { computePace } from "@/domain";
+import { AGING_BUCKET_LABELS, type AgingBucket } from "@/domain/finance/aging";
 import { getDemoAgents, dashboardPeriod } from "./_data/demo";
 import { loadData } from "./_data/source";
 import { loadFinanceSummary } from "./_data/live";
@@ -40,7 +41,7 @@ const DEPT_TILES: Tile[] = [
   { href: "/departments/finance", title: "Finance", sub: "Invoices, collections, payouts", icon: Wallet, grad: "from-[#D7A52C] to-[#7a5326]" },
   { href: "/departments/hr", title: "HR & Admin", sub: "Staff, leave and contracts", icon: Users, grad: "from-sky-700 to-blue-950" },
   { href: "/departments/inventory", title: "Inventory", sub: "Units, availability, stock", icon: Building2, grad: "from-orange-600 to-amber-900" },
-  { href: "/departments/expert", title: "Expert Mode", sub: "Match, ROI case, pitch", icon: Sparkles, grad: "from-[#3a2f1f] to-[#151311]" },
+  { href: "/departments/expert", title: "Client Advisory", sub: "Match, ROI case, pitch (read-only)", icon: Sparkles, grad: "from-[#3a2f1f] to-[#151311]" },
 ];
 
 const SYSTEM_TILES: Tile[] = [
@@ -80,7 +81,8 @@ export default async function PortalHome() {
   news.slice(0, 4).forEach((n, i) => {
     slides.push({
       meta: n.publishedAt ? n.publishedAt.slice(0, 10) : undefined,
-      kicker: `Market news · ${n.source}`,
+      // Google News is a discovery aggregator, not verification — say so.
+      kicker: `Aggregated news · ${n.source}`,
       title: n.title,
       body: "",
       href: n.link,
@@ -161,14 +163,25 @@ export default async function PortalHome() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-[#9C6B3B]">Alwalaa OS</p>
           <h1 className="mt-1 font-heading text-3xl sm:text-4xl">Command Portal</h1>
         </div>
-        <span
-          className={cn(
-            "rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide",
-            data.live ? "border-[#D7A52C66] bg-[#D7A52C1a] text-[#9C6B3B]" : "border-amber-500/40 bg-amber-500/10 text-amber-700",
-          )}
-        >
-          {data.live ? "Live · Supabase" : "Snapshot · not live"}
-        </span>
+        {/* Source health — active source, why, and freshness (rendered per request) */}
+        <div className="text-end">
+          <span
+            className={cn(
+              "inline-block rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide",
+              data.live ? "border-[#D7A52C66] bg-[#D7A52C1a] text-[#9C6B3B]" : "border-amber-500/40 bg-amber-500/10 text-amber-700",
+            )}
+          >
+            {data.live ? "Live · Supabase" : "Snapshot · not live"}
+          </span>
+          <p className={cn("mt-1 text-[10px]", MUTED)}>
+            {data.live
+              ? "Reading the system of record"
+              : "Supabase unreachable or CRM seed not applied — labeled snapshot shown"}
+            {" · as of "}
+            {new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Muscat", hour: "2-digit", minute: "2-digit" }).format(new Date())}
+            {" Muscat"}
+          </p>
+        </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_330px]">
@@ -221,7 +234,66 @@ export default async function PortalHome() {
         </div>
 
         {/* ---------------- Rail ---------------- */}
-        <aside className="space-y-6">
+        <aside className="space-y-6 xl:sticky xl:top-20 xl:self-start">
+          {/* Collections queue — cash first, from verified aging */}
+          {finance && finance.aging.openCount > 0 && (
+            <div className={cn(CARD, "p-5")}>
+              <h2 className="font-heading text-xl">Collections queue</h2>
+              <p className={cn("mt-0.5 text-[11px]", MUTED)}>
+                {finance.aging.openCount} open invoices · {formatOMR(finance.aging.openAmountOmr, true)} to collect
+              </p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {(Object.entries(finance.aging.buckets) as [AgingBucket, { count: number; amountOmr: number }][])
+                  .filter(([, v]) => v.count > 0)
+                  .map(([bucket, v]) => (
+                    <span
+                      key={bucket}
+                      className={cn(
+                        "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                        bucket.startsWith("overdue")
+                          ? "border-red-300 bg-red-500/10 text-red-700"
+                          : bucket === "due_date_unverified"
+                            ? "border-amber-400/50 bg-amber-500/10 text-amber-700"
+                            : "border-[#15131121] text-[#151311a6]",
+                      )}
+                    >
+                      {AGING_BUCKET_LABELS[bucket]}: {v.count} · {formatOMR(v.amountOmr, true)}
+                    </span>
+                  ))}
+              </div>
+              <ul className="mt-4 space-y-2">
+                {finance.aging.queue.slice(0, 3).map((q) => (
+                  <li key={`${q.reference}-${q.developer}`} className="rounded-xl border border-[#15131114] bg-white/80 p-3">
+                    <div className="flex items-baseline justify-between gap-2 text-sm">
+                      <span className="min-w-0 truncate font-medium">{q.reference ?? "(no ref)"}</span>
+                      <span className="shrink-0 font-semibold tabular-nums">{formatOMR(q.amountOmr, true)}</span>
+                    </div>
+                    <p className={cn("mt-0.5 text-[11px]", MUTED)}>
+                      {q.developer ?? "—"} ·{" "}
+                      {q.daysOverdue != null ? (
+                        <span className="font-semibold text-red-700">{q.daysOverdue} days overdue</span>
+                      ) : (
+                        AGING_BUCKET_LABELS[q.bucket]
+                      )}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/departments/finance"
+                className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-[#9C6B3B] hover:underline"
+              >
+                Open Finance copilot to chase <ArrowUpRight className="h-3 w-3" />
+              </Link>
+              {finance.aging.buckets.due_date_unverified.count > 0 && (
+                <p className={cn("mt-2 text-[10px]", MUTED)}>
+                  {finance.aging.buckets.due_date_unverified.count} invoices have unverified due dates — set them (with the
+                  contractual basis) before treating them as overdue.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Waiting on you — cross-department handoffs */}
           <div className={cn(CARD, "p-5")}>
             <h2 className="font-heading text-xl">Waiting on you</h2>

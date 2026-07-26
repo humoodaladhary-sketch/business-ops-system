@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "../lib/cn";
 import { ProToggle, WarRoomBadge, useProMode } from "./ProMode";
+import { MuscatClock } from "./MuscatClock";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/": LayoutDashboard,
@@ -132,7 +133,8 @@ export function Shell({
         {/* Top command bar — logo on mobile, Pro/War-Room switch top-right (all sizes) */}
         <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-hairline bg-ink-900/90 px-4 py-3 backdrop-blur print:hidden md:px-8">
           <Image src="/alwalaa-logo-white.png" alt="Alwalaa Real Estate" width={80} height={80} priority className="h-8 w-auto md:hidden" />
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ms-auto flex items-center gap-3">
+            <MuscatClock />
             <WarRoomBadge />
             <ProToggle />
           </div>
