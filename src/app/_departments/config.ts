@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { AGING_BUCKET_LABELS, OPEN_INVOICE_STATUSES, summarizeAging } from "@/domain/finance/aging";
 
 // The single organization (owner-only mode).
 export const ORG_ID = "6a32be59-155d-4662-9058-3a74fb2b6872";
@@ -558,6 +559,247 @@ export const updateUnitStatusTool: CopilotTool = {
   },
 };
 
+// ---- Revenue recovery (collections chase) -----------------------------------
+// The deal-to-cash chain: verified due dates → deterministic aging → linked
+// deals → approved follow-ups. Aging math is pure domain code, never the model.
+
+export const listCollectionQueueTool: CopilotTool = {
+  name: "list_collection_queue",
+  description:
+    "The collections chase queue: open commission invoices with deterministic aging (not-yet-due / due-soon / overdue buckets / due-date-unverified), sorted worst first. Chase from the top; fix unverified due dates with set_invoice_due_date before treating them as overdue.",
+  input_schema: { type: "object", properties: { limit: { type: "number" } } },
+  run: async (db, i) => {
+    const { data, error } = await db
+      .from("invoices")
+      .select("reference,developer,amount_omr,status,due_date")
+      .eq("organization_id", ORG_ID)
+      .in("status", [...OPEN_INVOICE_STATUSES]);
+    if (error) return { error: error.message };
+    const summary = summarizeAging(
+      (data as { reference: string | null; developer: string | null; amount_omr: number | string; status: string; due_date: string | null }[]).map(
+        (r) => ({
+          reference: r.reference,
+          developer: r.developer,
+          amountOmr: Number(r.amount_omr || 0),
+          status: r.status,
+          dueDate: r.due_date,
+        }),
+      ),
+      new Date(),
+    );
+    return {
+      buckets: Object.fromEntries(
+        Object.entries(summary.buckets).map(([k, v]) => [AGING_BUCKET_LABELS[k as keyof typeof AGING_BUCKET_LABELS], v]),
+      ),
+      open_count: summary.openCount,
+      open_amount_omr: summary.openAmountOmr,
+      overdue_count: summary.overdueCount,
+      overdue_amount_omr: summary.overdueAmountOmr,
+      queue: summary.queue.slice(0, num(i.limit, 15, 50)),
+      note: "Overdue = verified due date in the past. 'Due date unverified' rows need set_invoice_due_date (with the contractual basis) before chasing as overdue.",
+    };
+  },
+};
+
+export const linkInvoiceToDealTool: CopilotTool = {
+  name: "link_invoice_to_deal",
+  description:
+    "GUARDED WRITE — link a commission invoice to the closed deal that earned it (by invoice reference + deal client name). Without confirm:true it only previews.",
+  input_schema: {
+    type: "object",
+    properties: {
+      invoice_reference: { type: "string" },
+      client_name: { type: "string", description: "Client name on the deal (exact or partial)" },
+      note: { type: "string" },
+      confirm: { type: "boolean" },
+    },
+    required: ["invoice_reference", "client_name"],
+  },
+  run: async (db, i) => {
+    const inv = await db
+      .from("invoices")
+      .select("id,reference,developer,amount_omr")
+      .eq("organization_id", ORG_ID)
+      .eq("reference", String(i.invoice_reference ?? ""))
+      .limit(5);
+    if (inv.error) return { error: inv.error.message };
+    const invoices = (inv.data ?? []) as { id: string; reference: string; developer: string | null; amount_omr: number }[];
+    if (invoices.length === 0) return { error: `no invoice with reference '${i.invoice_reference}'` };
+    if (invoices.length > 1) return { ambiguous: true, candidates: invoices, note: "Reference matches several invoices — nothing was written." };
+
+    const deal = await db
+      .from("deals")
+      .select("id,client_name,value_omr,closed_at")
+      .eq("organization_id", ORG_ID)
+      .ilike("client_name", `%${String(i.client_name ?? "").replace(/[%_,()]/g, "")}%`)
+      .not("external_id", "is", null)
+      .limit(5);
+    if (deal.error) return { error: deal.error.message };
+    const deals = (deal.data ?? []) as { id: string; client_name: string | null; value_omr: number; closed_at: string | null }[];
+    if (deals.length === 0) return { error: `no deal matches client '${i.client_name}'` };
+    if (deals.length > 1) return { ambiguous: true, candidates: deals, note: "Several deals match — narrow the client name. Nothing was written." };
+
+    if (i.confirm !== true)
+      return needsConfirm({ invoice: invoices[0].reference, deal_client: deals[0].client_name, deal_value_omr: deals[0].value_omr });
+    const ins = await db
+      .from("invoice_deal_links")
+      .insert({
+        organization_id: ORG_ID,
+        invoice_id: invoices[0].id,
+        deal_id: deals[0].id,
+        source: "copilot",
+        note: (i.note as string) ?? null,
+      })
+      .select("id")
+      .single();
+    if (ins.error) {
+      return ins.error.message.includes("duplicate")
+        ? { unchanged: true, note: "This invoice is already linked to that deal." }
+        : { error: ins.error.message };
+    }
+    return { linked: true, invoice: invoices[0].reference, deal_client: deals[0].client_name };
+  },
+};
+
+export const setInvoiceDueDateTool: CopilotTool = {
+  name: "set_invoice_due_date",
+  description:
+    "GUARDED WRITE — set and VERIFY an invoice's due date. Requires the contractual basis (e.g. '45 days from SPA per agreement'); a due date is never guessed. Without confirm:true it only previews.",
+  input_schema: {
+    type: "object",
+    properties: {
+      invoice_reference: { type: "string" },
+      due_date: { type: "string", description: "YYYY-MM-DD" },
+      basis: { type: "string", description: "Where this due date comes from — contract term, Zoho terms, developer confirmation" },
+      confirm: { type: "boolean" },
+    },
+    required: ["invoice_reference", "due_date", "basis"],
+  },
+  run: async (db, i) => {
+    const due = String(i.due_date ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(due) || Number.isNaN(new Date(`${due}T00:00:00Z`).getTime()))
+      return { error: "due_date must be a valid YYYY-MM-DD date" };
+    const basis = String(i.basis ?? "").trim();
+    if (!basis) return { error: "basis is required — a due date without provenance stays unverified" };
+    const { data, error } = await db
+      .from("invoices")
+      .select("id,reference,due_date,status")
+      .eq("organization_id", ORG_ID)
+      .eq("reference", String(i.invoice_reference ?? ""))
+      .limit(5);
+    if (error) return { error: error.message };
+    const rows = (data ?? []) as { id: string; reference: string; due_date: string | null; status: string }[];
+    if (rows.length === 0) return { error: `no invoice with reference '${i.invoice_reference}'` };
+    if (rows.length > 1) return { ambiguous: true, candidates: rows, note: "Reference matches several invoices — nothing was written." };
+    if (i.confirm !== true)
+      return needsConfirm({ invoice: rows[0].reference, from: rows[0].due_date ?? "(unset)", to: due, basis });
+    const upd = await db
+      .from("invoices")
+      .update({ due_date: due, due_date_verified: true, due_date_basis: basis })
+      .eq("id", rows[0].id)
+      .select("id,reference,due_date")
+      .single();
+    return upd.error
+      ? { error: `${upd.error.message} (migration 0009 may not be applied yet)` }
+      : { updated: true, invoice: upd.data, verified: true };
+  },
+};
+
+const FOLLOWUP_KINDS = [
+  "due_reminder", "first_overdue", "second_escalation", "management_escalation",
+  "dispute_clarification", "partial_balance", "remittance_confirmation",
+];
+
+export const createCollectionFollowupTool: CopilotTool = {
+  name: "create_collection_followup",
+  description:
+    "GUARDED WRITE — record an approved collection follow-up for an invoice: the kind of chase and the exact message wording. Respond.io is NOT connected: the follow-up is stored as an approved draft for the owner to copy and send, then log with log_collection_contact. Never accuse a payer of default without verified terms. Without confirm:true it only previews.",
+  input_schema: {
+    type: "object",
+    properties: {
+      invoice_reference: { type: "string" },
+      kind: { type: "string", enum: FOLLOWUP_KINDS },
+      message: { type: "string", description: "The exact wording to send (no internal commission details beyond the invoice itself)" },
+      due_at: { type: "string", description: "Optional YYYY-MM-DD when this chase should happen" },
+      confirm: { type: "boolean" },
+    },
+    required: ["invoice_reference", "kind", "message"],
+  },
+  run: async (db, i) => {
+    const kind = String(i.kind ?? "");
+    if (!FOLLOWUP_KINDS.includes(kind)) return { error: `kind must be one of: ${FOLLOWUP_KINDS.join(", ")}` };
+    const message = String(i.message ?? "").trim();
+    if (!message) return { error: "message is required — the owner approves exact wording, not an intention" };
+    const { data, error } = await db
+      .from("invoices")
+      .select("id,reference,developer,amount_omr,status,due_date")
+      .eq("organization_id", ORG_ID)
+      .eq("reference", String(i.invoice_reference ?? ""))
+      .limit(5);
+    if (error) return { error: error.message };
+    const rows = (data ?? []) as { id: string; reference: string; developer: string | null; amount_omr: number; status: string; due_date: string | null }[];
+    if (rows.length === 0) return { error: `no invoice with reference '${i.invoice_reference}'` };
+    if (rows.length > 1) return { ambiguous: true, candidates: rows, note: "Reference matches several invoices — nothing was written." };
+    if (i.confirm !== true)
+      return needsConfirm({ invoice: rows[0].reference, payer: rows[0].developer, kind, message });
+    const ins = await db
+      .from("collection_followups")
+      .insert({
+        organization_id: ORG_ID,
+        invoice_id: rows[0].id,
+        kind,
+        status: "approved",
+        channel: "whatsapp_draft",
+        message,
+        due_at: i.due_at ? `${String(i.due_at)}T09:00:00Z` : null,
+      })
+      .select("id,kind,status")
+      .single();
+    return ins.error
+      ? { error: `${ins.error.message} (migration 0009 may not be applied yet)` }
+      : {
+          recorded: true,
+          followup: ins.data,
+          note: "Respond.io not connected — draft only. Copy the message, send it manually, then log the send with log_collection_contact.",
+        };
+  },
+};
+
+export const logCollectionContactTool: CopilotTool = {
+  name: "log_collection_contact",
+  description:
+    "GUARDED WRITE — log that a collection follow-up was actually sent, and/or the payer's response. Without confirm:true it only previews.",
+  input_schema: {
+    type: "object",
+    properties: {
+      followup_id: { type: "string", description: "collection_followups.id (from list results)" },
+      outcome: { type: "string", enum: ["sent", "responded"] },
+      response: { type: "string", description: "What the payer said (when outcome is responded)" },
+      confirm: { type: "boolean" },
+    },
+    required: ["followup_id", "outcome"],
+  },
+  run: async (db, i) => {
+    const outcome = String(i.outcome ?? "");
+    if (outcome !== "sent" && outcome !== "responded") return { error: "outcome must be sent or responded" };
+    const { data, error } = await db
+      .from("collection_followups")
+      .select("id,kind,status,invoice_id")
+      .eq("organization_id", ORG_ID)
+      .eq("id", String(i.followup_id ?? ""))
+      .single();
+    if (error) return { error: `${error.message} (migration 0009 may not be applied yet)` };
+    const fu = data as { id: string; kind: string; status: string };
+    if (i.confirm !== true) return needsConfirm({ followup: fu.id, kind: fu.kind, from: fu.status, to: outcome });
+    const patch =
+      outcome === "sent"
+        ? { status: "sent", sent_at: new Date().toISOString() }
+        : { status: "responded", response: (i.response as string) ?? null };
+    const upd = await db.from("collection_followups").update(patch).eq("id", fu.id).select("id,status").single();
+    return upd.error ? { error: upd.error.message } : { updated: true, followup: upd.data };
+  },
+};
+
 export const completeTaskTool: CopilotTool = {
   name: "complete_task",
   description: "GUARDED WRITE — mark a handed-off task (from list_my_inbox) as done by its id. Without confirm:true it only previews.",
@@ -596,7 +838,15 @@ const expertTools: CopilotTool[] = [
 // Wire the guarded writes into their departments (Expert Mode stays read-only).
 salesTools.push(moveLeadStageTool);
 hrTools.push(decideLeaveRequestTool);
-financeTools.push(updateInvoiceStatusTool, recordCollectionTool);
+financeTools.push(
+  listCollectionQueueTool,
+  updateInvoiceStatusTool,
+  recordCollectionTool,
+  linkInvoiceToDealTool,
+  setInvoiceDueDateTool,
+  createCollectionFollowupTool,
+  logCollectionContactTool,
+);
 inventoryTools.push(updateUnitStatusTool);
 
 const withShared = (tools: CopilotTool[]) => [...tools, inbox, handoff, completeTaskTool];
@@ -606,7 +856,8 @@ const FINANCE_SYSTEM = `You are the Finance copilot (Chief Finance Officer) for 
 What you do:
 - Read live figures with finance_summary and list_invoices (and list_my_inbox) before answering; quote exact OMR, never rounded guesses.
 - Commission model: Alwalaa earns 3-4% of property value (ex-VAT) from the developer; the agent's share of Alwalaa's net is 25% standard, 35% senior, 50% on referral leads; the referral introducer gets 1%. A deal is booked only after Sulaiman validates it.
-- Track what matters, worst first: invoiced vs collected vs outstanding, overdue invoices, and closed deals not yet invoiced — chase these before anything else.
+- Track what matters, worst first: invoiced vs collected vs outstanding, overdue invoices, and closed deals not yet invoiced — chase these before anything else. Outstanding is NOT the same as overdue: only a verified due date in the past is overdue; use list_collection_queue for the deterministic aging buckets, and fix "due date unverified" rows with set_invoice_due_date (always with the contractual basis) before chasing them.
+- The chase discipline: verify the due date and amount → draft the exact message → get the owner's confirmation → create_collection_followup (stored as an approved draft; Respond.io is not connected, so the owner sends it manually) → log_collection_contact when sent and when the payer responds. Link every invoice to its deal with link_invoice_to_deal so entitlement is traceable. Never accuse a payer of default without verified contractual terms.
 - On request, give the weekly finance brief: cash position, what came in, what is overdue, payables needing the owner's approval, and the one decision he must make.
 - Watch VAT (the company is registered) and keep personal and company cash separate — flag any owner-funded expense that should be reimbursed or booked as an owner loan.
 
@@ -790,7 +1041,7 @@ export const DEPARTMENTS: Department[] = [
   },
   {
     id: "expert",
-    label: "Expert Mode",
+    label: "Client Advisory",
     blurb: "Deal-closer: match a unit, build the ROI case, draft the pitch.",
     icon: "Sparkles",
     accent: "text-gold",

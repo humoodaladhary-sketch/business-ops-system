@@ -7,6 +7,7 @@
 // must never surface on an owner-facing screen.
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ORG_ID } from "../_departments/config";
+import { summarizeAging, type AgingSummary } from "@/domain/finance/aging";
 import type { AgentRecord, DealRecord, LeadRecord, SourceTag } from "./dataset";
 import type { DataBundle } from "./source";
 
@@ -241,23 +242,42 @@ export interface FinanceSummary {
   invoiceCount: number;
   overdueCount: number;
   overdueOMR: number;
+  /** Deterministic aging over open invoices — outstanding is never conflated
+   *  with overdue; unverified due dates get their own bucket. */
+  aging: AgingSummary;
 }
 
 export async function loadFinanceSummary(): Promise<FinanceSummary | null> {
   const db = supabaseAdmin();
   if (!db) return null;
   const [inv, col] = await Promise.all([
-    db.from("invoices").select("amount_omr,status").eq("organization_id", ORG_ID),
+    db.from("invoices").select("reference,developer,amount_omr,status,due_date").eq("organization_id", ORG_ID),
     db.from("collections").select("amount_omr").eq("organization_id", ORG_ID),
   ]);
   if (inv.error || col.error || !inv.data || inv.data.length === 0) return null;
-  const invoices = inv.data as { amount_omr: number | string; status: string }[];
+  const invoices = inv.data as {
+    reference: string | null;
+    developer: string | null;
+    amount_omr: number | string;
+    status: string;
+    due_date: string | null;
+  }[];
   const invoiced = invoices.reduce((s, r) => s + num(r.amount_omr), 0);
   const collected = ((col.data ?? []) as { amount_omr: number | string }[]).reduce(
     (s, r) => s + num(r.amount_omr),
     0,
   );
   const overdue = invoices.filter((r) => r.status === "overdue");
+  const aging = summarizeAging(
+    invoices.map((r) => ({
+      reference: r.reference,
+      developer: r.developer,
+      amountOmr: num(r.amount_omr),
+      status: r.status,
+      dueDate: r.due_date,
+    })),
+    new Date(),
+  );
   return {
     invoicedOMR: invoiced,
     collectedOMR: collected,
@@ -265,5 +285,6 @@ export async function loadFinanceSummary(): Promise<FinanceSummary | null> {
     invoiceCount: invoices.length,
     overdueCount: overdue.length,
     overdueOMR: overdue.reduce((s, r) => s + num(r.amount_omr), 0),
+    aging,
   };
 }
