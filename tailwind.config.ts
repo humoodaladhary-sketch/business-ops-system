@@ -25,6 +25,8 @@ const config: Config = {
           deep: "#9C6B3B",
         },
         bronze: "rgb(var(--bronze) / <alpha-value>)",
+        // Light "portal sheet" surface (same cream the report sheet uses).
+        cream: "#FBF8F1",
         // Semantic tier colors for the commission ladder.
         tier: {
           recovery: "#9CA3AF", // < 50%
