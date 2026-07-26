@@ -51,7 +51,7 @@ export default function WarRoom() {
         </span>
         <div>
           <p className="text-[11px] uppercase tracking-[0.22em] text-gold/70">Pro · Closing mode</p>
-          <h1 className="font-heading text-3xl text-white">War Room</h1>
+          <h1 className="font-heading text-3xl text-white">Pro Mode</h1>
           <p className="text-sm text-white/50">Match a unit, run the numbers, generate the offer — everything to close, in one place.</p>
         </div>
       </div>

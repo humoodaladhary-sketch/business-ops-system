@@ -15,6 +15,10 @@ export interface HeroSlide {
   href: string;
   cta: string;
   tone: "gold" | "ink" | "bronze" | "risk";
+  /** External articles open in a new tab (news items). */
+  external?: boolean;
+  /** Small chip above the kicker, e.g. a publish date. */
+  meta?: string;
 }
 
 const TONE_BG: Record<HeroSlide["tone"], string> = {
@@ -55,17 +59,33 @@ export function PortalHero({ slides }: { slides: HeroSlide[] }) {
       <div aria-hidden className="pointer-events-none absolute -end-24 -top-24 h-72 w-72 rounded-full bg-gold/10 blur-3xl" />
       <div aria-hidden className="pointer-events-none absolute -bottom-32 -start-16 h-64 w-64 rounded-full bg-gold/5 blur-3xl" />
 
+      {slide.meta && (
+        <span className="mb-3 inline-flex items-center rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[10px] font-medium tracking-wide text-white/60">
+          {slide.meta}
+        </span>
+      )}
       <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold/80">{slide.kicker}</p>
       <h2 className="mt-3 max-w-2xl font-heading text-3xl leading-tight sm:text-[40px]">{slide.title}</h2>
-      <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/65">{slide.body}</p>
+      {slide.body && <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/65">{slide.body}</p>}
 
       <div className="mt-6 flex items-center justify-between gap-4">
-        <Link
-          href={slide.href}
-          className="inline-flex items-center gap-2 rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-ink transition hover:brightness-110"
-        >
-          {slide.cta} <ArrowUpRight className="h-4 w-4" />
-        </Link>
+        {slide.external ? (
+          <a
+            href={slide.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-ink transition hover:brightness-110"
+          >
+            {slide.cta} <ArrowUpRight className="h-4 w-4" />
+          </a>
+        ) : (
+          <Link
+            href={slide.href}
+            className="inline-flex items-center gap-2 rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-ink transition hover:brightness-110"
+          >
+            {slide.cta} <ArrowUpRight className="h-4 w-4" />
+          </Link>
+        )}
         {slides.length > 1 && (
           <div className="flex items-center gap-2" role="tablist" aria-label="Highlight slides">
             {slides.map((s, i) => (

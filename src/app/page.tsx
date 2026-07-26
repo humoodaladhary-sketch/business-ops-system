@@ -9,6 +9,7 @@ import { getDemoAgents, dashboardPeriod } from "./_data/demo";
 import { loadData } from "./_data/source";
 import { loadFinanceSummary } from "./_data/live";
 import { loadInboxTasks, loadUnitCounts } from "./_data/portal";
+import { loadNews } from "./_data/news";
 import { PortalHero, type HeroSlide } from "./components/PortalHero";
 import { formatOMR, formatPct } from "./lib/format";
 import { cn } from "./lib/cn";
@@ -43,18 +44,19 @@ const DEPT_TILES: Tile[] = [
 ];
 
 const SYSTEM_TILES: Tile[] = [
-  { href: "/war-room", title: "War Room", sub: "Calculators, offers, ITC map", icon: Swords, grad: "from-red-800 to-rose-950" },
+  { href: "/war-room", title: "Pro Mode", sub: "Calculators, offers, ITC map", icon: Swords, grad: "from-red-800 to-rose-950" },
   { href: "/war-room", title: "ITC Map", sub: "Zones, eligibility, briefs", icon: Map, grad: "from-teal-700 to-cyan-950" },
   { href: "/reports", title: "Reports", sub: "Presentation-grade monthly", icon: FileText, grad: "from-stone-600 to-stone-900" },
   { href: "/analytics", title: "Analytics", sub: "Agents, rankings, trends", icon: BarChart3, grad: "from-indigo-700 to-slate-950" },
 ];
 
 export default async function PortalHome() {
-  const [data, finance, inbox, unitCounts] = await Promise.all([
+  const [data, finance, inbox, unitCounts, news] = await Promise.all([
     loadData(),
     loadFinanceSummary(),
     loadInboxTasks(),
     loadUnitCounts(),
+    loadNews(6),
   ]);
   const period = dashboardPeriod(data);
   const { day: dayOfMonth, days: daysInMonth } = paceClock(data.live, period);
@@ -70,11 +72,26 @@ export default async function PortalHome() {
   const atRisk = agents.filter((a) => a.atRisk.atRisk);
   const watch = agents.filter((a) => a.atRisk.watch && !a.atRisk.atRisk);
 
-  // Hero slides — every figure comes from live/loaded data; missing data means
-  // the slide simply doesn't exist.
+  // Hero slides — live business news first (OBB-portal style), with the cash
+  // call-to-action pinned ahead of it whenever collections are overdue. Every
+  // figure comes from live/loaded data; missing data means no slide.
   const slides: HeroSlide[] = [];
-  if (finance) {
+  const NEWS_TONES: HeroSlide["tone"][] = ["ink", "bronze", "gold"];
+  news.slice(0, 4).forEach((n, i) => {
     slides.push({
+      meta: n.publishedAt ? n.publishedAt.slice(0, 10) : undefined,
+      kicker: `Market news · ${n.source}`,
+      title: n.title,
+      body: "",
+      href: n.link,
+      cta: "Read more",
+      tone: NEWS_TONES[i % NEWS_TONES.length],
+      external: true,
+    });
+  });
+  if (finance) {
+    // Overdue cash outranks headlines — pin it as the first slide.
+    slides[finance.overdueCount > 0 ? "unshift" : "push"]({
       kicker: "Finance · live from Zoho Books",
       title: `${formatOMR(finance.outstandingOMR, true)} outstanding to collect`,
       body: `${formatOMR(finance.invoicedOMR, true)} invoiced across ${finance.invoiceCount} commission invoices · ${formatOMR(finance.collectedOMR, true)} recorded collected · ${finance.overdueCount} overdue worth ${formatOMR(finance.overdueOMR, true)}.`,
@@ -157,7 +174,17 @@ export default async function PortalHome() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_330px]">
         {/* ---------------- Main column ---------------- */}
         <div className="min-w-0 space-y-6">
-          <PortalHero slides={slides} />
+          <div>
+            <PortalHero slides={slides} />
+            <div className="mt-2 flex items-center justify-between px-1">
+              <p className={cn("text-[11px]", MUTED)}>
+                {news.length > 0 ? "Live market feed — Oman real estate, MoHUP, Omran & partners · refreshes ~30 min" : "Business highlights"}
+              </p>
+              <Link href="/news" className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#9C6B3B] hover:underline">
+                All news <ArrowUpRight className="h-3 w-3" />
+              </Link>
+            </div>
+          </div>
 
           {/* KPI band */}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
