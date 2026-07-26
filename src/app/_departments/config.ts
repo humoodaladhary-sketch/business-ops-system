@@ -132,6 +132,7 @@ const salesTools: CopilotTool[] = [
   },
   listDealsTool,
 ];
+// (move_lead_stage is appended after the guarded write tools are defined below.)
 
 const marketingTools: CopilotTool[] = [
   {
@@ -333,6 +334,255 @@ const listUnitsTool: CopilotTool = {
 
 const inventoryTools: CopilotTool[] = [inventorySummaryTool, listUnitsTool];
 
+// ---- Guarded write tools ----------------------------------------------------
+// Every write requires confirm:true. Without it the tool returns a preview and
+// writes NOTHING — enforcing in code the personas' "state exactly what you will
+// write and confirm first" contract, so a copilot can never act on a hunch.
+const needsConfirm = (preview: Record<string, unknown>) => ({
+  needs_confirmation: true,
+  preview,
+  note: "Nothing was written. State this change to the owner and repeat the call with confirm: true once they agree.",
+});
+
+const LEAD_STAGES = ["new", "qualified", "engaged", "viewing", "negotiation", "reservation", "closed_won", "closed_lost"];
+const INVOICE_STATUSES = ["draft", "sent", "partially_paid", "paid", "overdue", "cancelled"];
+const UNIT_STATUSES = ["available", "reserved", "sold"];
+
+export const moveLeadStageTool: CopilotTool = {
+  name: "move_lead_stage",
+  description:
+    "GUARDED WRITE — move a lead to another pipeline stage. Finds the lead by phone (exact) or name (partial). Without confirm:true it only previews; ambiguous matches are returned as candidates, never written.",
+  input_schema: {
+    type: "object",
+    properties: {
+      lead: { type: "string", description: "Lead phone (E.164) or name (exact or partial)" },
+      stage: { type: "string", enum: LEAD_STAGES },
+      confirm: { type: "boolean", description: "true only after the owner confirmed the exact change" },
+    },
+    required: ["lead", "stage"],
+  },
+  run: async (db, i) => {
+    const stage = String(i.stage ?? "");
+    const needle = String(i.lead ?? "").trim();
+    if (!LEAD_STAGES.includes(stage)) return { error: `invalid stage '${stage}'` };
+    if (!needle) return { error: "lead is required" };
+    let { data, error } = await db
+      .from("leads")
+      .select("id,name,phone_e164,stage")
+      .eq("organization_id", ORG_ID)
+      .eq("phone_e164", needle)
+      .limit(5);
+    if (error) return { error: error.message };
+    if (!data?.length) {
+      ({ data, error } = await db
+        .from("leads")
+        .select("id,name,phone_e164,stage")
+        .eq("organization_id", ORG_ID)
+        .ilike("name", `%${needle.replace(/[%_,()]/g, "")}%`)
+        .limit(5));
+      if (error) return { error: error.message };
+    }
+    const rows = (data ?? []) as { id: string; name: string; phone_e164: string | null; stage: string }[];
+    if (rows.length === 0) return { error: `no lead matches '${needle}'` };
+    if (rows.length > 1) return { ambiguous: true, candidates: rows, note: "Narrow the search — nothing was written." };
+    const lead = rows[0];
+    if (lead.stage === stage) return { unchanged: true, lead: lead.name, stage };
+    if (i.confirm !== true) return needsConfirm({ lead: lead.name, phone: lead.phone_e164, from: lead.stage, to: stage });
+    const upd = await db
+      .from("leads")
+      .update({ stage, last_touch_at: new Date().toISOString() })
+      .eq("id", lead.id)
+      .select("id,name,stage")
+      .single();
+    return upd.error ? { error: upd.error.message } : { updated: true, lead: upd.data };
+  },
+};
+
+export const decideLeaveRequestTool: CopilotTool = {
+  name: "decide_leave_request",
+  description:
+    "GUARDED WRITE — approve or reject a pending leave request by its id (from pending_leave_requests). Without confirm:true it only previews.",
+  input_schema: {
+    type: "object",
+    properties: {
+      request_id: { type: "string", description: "leave_requests.id (uuid)" },
+      decision: { type: "string", enum: ["approve", "reject"] },
+      confirm: { type: "boolean" },
+    },
+    required: ["request_id", "decision"],
+  },
+  run: async (db, i) => {
+    const decision = String(i.decision ?? "");
+    if (decision !== "approve" && decision !== "reject") return { error: "decision must be approve or reject" };
+    const { data, error } = await db
+      .from("leave_requests")
+      .select("id,staff_id,start_date,end_date,reason,status")
+      .eq("organization_id", ORG_ID)
+      .eq("id", String(i.request_id ?? ""))
+      .single();
+    if (error) return { error: error.message };
+    const req = data as { id: string; staff_id: string; start_date: string; end_date: string; status: string };
+    if (req.status !== "pending") return { error: `request is already '${req.status}' — only pending requests can be decided` };
+    if (i.confirm !== true)
+      return needsConfirm({ request_id: req.id, staff_id: req.staff_id, dates: `${req.start_date} → ${req.end_date}`, decision });
+    const upd = await db
+      .from("leave_requests")
+      .update({ status: decision === "approve" ? "approved" : "rejected", approved_at: new Date().toISOString() })
+      .eq("id", req.id)
+      .select("id,status")
+      .single();
+    return upd.error ? { error: upd.error.message } : { updated: true, request: upd.data };
+  },
+};
+
+export const updateInvoiceStatusTool: CopilotTool = {
+  name: "update_invoice_status",
+  description:
+    "GUARDED WRITE — set a commission invoice's status by its reference (draft, sent, partially_paid, paid, overdue, cancelled). Without confirm:true it only previews.",
+  input_schema: {
+    type: "object",
+    properties: {
+      reference: { type: "string", description: "Invoice reference exactly as listed" },
+      status: { type: "string", enum: INVOICE_STATUSES },
+      confirm: { type: "boolean" },
+    },
+    required: ["reference", "status"],
+  },
+  run: async (db, i) => {
+    const status = String(i.status ?? "");
+    if (!INVOICE_STATUSES.includes(status)) return { error: `invalid status '${status}'` };
+    const { data, error } = await db
+      .from("invoices")
+      .select("id,reference,developer,amount_omr,status")
+      .eq("organization_id", ORG_ID)
+      .eq("reference", String(i.reference ?? ""))
+      .limit(5);
+    if (error) return { error: error.message };
+    const rows = (data ?? []) as { id: string; reference: string; developer: string | null; amount_omr: number; status: string }[];
+    if (rows.length === 0) return { error: `no invoice with reference '${i.reference}'` };
+    if (rows.length > 1) return { ambiguous: true, candidates: rows, note: "Reference matches several invoices — nothing was written." };
+    const inv = rows[0];
+    if (inv.status === status) return { unchanged: true, reference: inv.reference, status };
+    if (i.confirm !== true)
+      return needsConfirm({ reference: inv.reference, developer: inv.developer, amount_omr: inv.amount_omr, from: inv.status, to: status });
+    const upd = await db.from("invoices").update({ status }).eq("id", inv.id).select("id,reference,status").single();
+    return upd.error ? { error: upd.error.message } : { updated: true, invoice: upd.data };
+  },
+};
+
+export const recordCollectionTool: CopilotTool = {
+  name: "record_collection",
+  description:
+    "GUARDED WRITE — record commission cash received from a developer (a collections row), optionally linked to an invoice by reference. Amounts are OMR. Without confirm:true it only previews.",
+  input_schema: {
+    type: "object",
+    properties: {
+      amount_omr: { type: "number", description: "Amount received, OMR" },
+      invoice_reference: { type: "string", description: "Optional invoice reference to link" },
+      received_date: { type: "string", description: "YYYY-MM-DD; defaults to today" },
+      method: { type: "string", description: "e.g. bank transfer, cheque" },
+      reference: { type: "string", description: "Payment reference / transaction id" },
+      confirm: { type: "boolean" },
+    },
+    required: ["amount_omr"],
+  },
+  run: async (db, i) => {
+    const amount = Number(i.amount_omr);
+    if (!Number.isFinite(amount) || amount <= 0) return { error: "amount_omr must be a positive number" };
+    let invoiceId: string | null = null;
+    let invoiceLabel: string | null = null;
+    if (i.invoice_reference) {
+      const { data, error } = await db
+        .from("invoices")
+        .select("id,reference,amount_omr")
+        .eq("organization_id", ORG_ID)
+        .eq("reference", String(i.invoice_reference))
+        .limit(5);
+      if (error) return { error: error.message };
+      const rows = (data ?? []) as { id: string; reference: string }[];
+      if (rows.length === 0) return { error: `no invoice with reference '${i.invoice_reference}'` };
+      if (rows.length > 1) return { ambiguous: true, candidates: rows, note: "Reference matches several invoices — nothing was written." };
+      invoiceId = rows[0].id;
+      invoiceLabel = rows[0].reference;
+    }
+    const received = (i.received_date as string) || new Date().toISOString().slice(0, 10);
+    if (i.confirm !== true)
+      return needsConfirm({ amount_omr: amount, invoice: invoiceLabel, received_date: received, method: i.method ?? null });
+    const ins = await db
+      .from("collections")
+      .insert({
+        organization_id: ORG_ID,
+        invoice_id: invoiceId,
+        amount_omr: amount,
+        received_date: received,
+        method: (i.method as string) ?? null,
+        reference: (i.reference as string) ?? null,
+      })
+      .select("id,amount_omr,received_date")
+      .single();
+    return ins.error ? { error: ins.error.message } : { recorded: true, collection: ins.data };
+  },
+};
+
+export const updateUnitStatusTool: CopilotTool = {
+  name: "update_unit_status",
+  description:
+    "GUARDED WRITE — set a unit's availability (available, reserved, sold) by its reference_id. Without confirm:true it only previews.",
+  input_schema: {
+    type: "object",
+    properties: {
+      reference_id: { type: "string", description: "The unit's reference_id exactly as listed" },
+      status: { type: "string", enum: UNIT_STATUSES },
+      confirm: { type: "boolean" },
+    },
+    required: ["reference_id", "status"],
+  },
+  run: async (db, i) => {
+    const status = String(i.status ?? "");
+    if (!UNIT_STATUSES.includes(status)) return { error: `invalid status '${status}'` };
+    const { data, error } = await db
+      .from("units")
+      .select("id,reference_id,unit_type,status,projects(name)")
+      .eq("organization_id", ORG_ID)
+      .eq("reference_id", String(i.reference_id ?? ""))
+      .limit(5);
+    if (error) return { error: error.message };
+    const rows = (data ?? []) as { id: string; reference_id: string; status: string }[];
+    if (rows.length === 0) return { error: `no unit with reference_id '${i.reference_id}'` };
+    if (rows.length > 1) return { ambiguous: true, candidates: rows, note: "reference_id matches several units — nothing was written." };
+    const unit = rows[0];
+    if (unit.status === status) return { unchanged: true, reference_id: unit.reference_id, status };
+    if (i.confirm !== true) return needsConfirm({ reference_id: unit.reference_id, from: unit.status, to: status });
+    const upd = await db.from("units").update({ status }).eq("id", unit.id).select("id,reference_id,status").single();
+    return upd.error ? { error: upd.error.message } : { updated: true, unit: upd.data };
+  },
+};
+
+export const completeTaskTool: CopilotTool = {
+  name: "complete_task",
+  description: "GUARDED WRITE — mark a handed-off task (from list_my_inbox) as done by its id. Without confirm:true it only previews.",
+  input_schema: {
+    type: "object",
+    properties: { task_id: { type: "string" }, confirm: { type: "boolean" } },
+    required: ["task_id"],
+  },
+  run: async (db, i, deptId) => {
+    const { data, error } = await db
+      .from("department_tasks")
+      .select("id,title,status,to_department")
+      .eq("organization_id", ORG_ID)
+      .eq("id", String(i.task_id ?? ""))
+      .single();
+    if (error) return { error: error.message };
+    const task = data as { id: string; title: string; status: string; to_department: string };
+    if (task.to_department !== deptId) return { error: `task belongs to '${task.to_department}', not this department` };
+    if (task.status === "done") return { unchanged: true, task: task.title };
+    if (i.confirm !== true) return needsConfirm({ task: task.title, from: task.status, to: "done" });
+    const upd = await db.from("department_tasks").update({ status: "done" }).eq("id", task.id).select("id,title,status").single();
+    return upd.error ? { error: upd.error.message } : { updated: true, task: upd.data };
+  },
+};
+
 // Expert Mode reads across departments (inventory + prices, pipeline + deals,
 // finance context) but writes nothing itself — the same read tools, reused.
 const expertTools: CopilotTool[] = [
@@ -343,7 +593,13 @@ const expertTools: CopilotTool[] = [
   financeSummaryTool,
 ];
 
-const withShared = (tools: CopilotTool[]) => [...tools, inbox, handoff];
+// Wire the guarded writes into their departments (Expert Mode stays read-only).
+salesTools.push(moveLeadStageTool);
+hrTools.push(decideLeaveRequestTool);
+financeTools.push(updateInvoiceStatusTool, recordCollectionTool);
+inventoryTools.push(updateUnitStatusTool);
+
+const withShared = (tools: CopilotTool[]) => [...tools, inbox, handoff, completeTaskTool];
 
 const FINANCE_SYSTEM = `You are the Finance copilot (Chief Finance Officer) for Alwalaa Real Estate — legal entity Alwalaa Leading Projects SPC (CR 1386871, VATIN OM1100425149). You own the company's own money: commission invoicing, collections, agent payouts, VAT, payroll and the owner's finance picture.
 
@@ -354,7 +610,7 @@ What you do:
 - On request, give the weekly finance brief: cash position, what came in, what is overdue, payables needing the owner's approval, and the one decision he must make.
 - Watch VAT (the company is registered) and keep personal and company cash separate — flag any owner-funded expense that should be reimbursed or booked as an owner loan.
 
-How you act (do-er + advisor): compute, draft and recommend directly. To raise or send an invoice, schedule a payout, or record a collection, first state exactly what you will write (amount, party, reference) and confirm; then use your tools, or hand the task off with handoff_to_department if no write tool exists yet. Never stop at "I can't."
+How you act (do-er + advisor): compute, draft and recommend directly. To record a collection or change an invoice's status, first state exactly what you will write (amount, party, reference) and confirm; then use record_collection / update_invoice_status (they preview until you pass confirm:true). To raise a new invoice or schedule a payout, hand off with handoff_to_department. Never stop at "I can't."
 
 What you do NOT do: no client-facing investor ROI/yield/underwriting (that is Advisory); no agent coaching or commission-scheme design (Sales/HR). You flag tax and Omani-law questions and verify them — you are not the accountant or lawyer of record.`;
 
@@ -373,7 +629,7 @@ How you act (do-er + advisor):
 - Qualify nationality early — non-GCC buyers are ITC-only; do not advance a non-GCC lead on a Future City or Surooh unit.
 - Diagnose why the pipeline is stalling — velocity fell after the February peak — and prep the sales meeting off live numbers, not impressions.
 - Name concentration risk plainly: the book leans heavily on the single top closer; advise on rebalancing leads and coaching each agent toward target.
-- To move a lead's stage or assignment, or to log a deal, state exactly what you will write and confirm first — then use the tool, or where no write tool exists yet, hand off with handoff_to_department. A deal is booked only after Sulaiman validates it.
+- To move a lead's stage, state exactly what you will write and confirm first — then use move_lead_stage (it previews until you pass confirm:true). For assignment changes or logging a deal, hand off with handoff_to_department. A deal is booked only after Sulaiman validates it.
 
 What you do NOT do:
 - Company finance and commission accounting — that is Finance. The 3-4% developer fee and the 25/35/50% agent-net split are internal context only; never quote them to a client.
@@ -437,7 +693,7 @@ What you do:
 
 How you act (do-er + advisor):
 - Read list_staff, pending_leave_requests and leave_catalog first, then answer; use list_my_inbox for what is waiting on you and handoff_to_department when the request belongs to another desk.
-- To approve a leave request or change a staff record, state exactly what you will write — the person, the field, the old value and the new value — and confirm before writing.
+- To approve or reject a leave request, state exactly what you will write — the person, the dates, the decision — and confirm; then use decide_leave_request (it previews until you pass confirm:true). Other staff-record changes go through handoff_to_department.
 - Omani Labour Law (Royal Decree 53/2023) governs contracts, leave, probation and termination — flag it when it bears on the answer and verify the current rule; never present a legal specific from memory as fact.
 - Keep anything termination-adjacent to a DRAFT only, and attach a line telling the owner to have a lawyer verify it against current Omani Labour Law — you never stand in for a lawyer on termination.
 - When you flag an expiry or a gap, propose the fix — the renewal to start, the contract to issue, the review to schedule — rather than only raising it.
@@ -457,7 +713,7 @@ What you do:
 How you act (do-er + advisor):
 - Lead with the answer, then the detail: summarize availability and aging, and tell the owner plainly what to push, what to hold, and what is going stale.
 - Prepare clean, accurate unit facts when a listing or a pitch needs them, so whoever faces the client is quoting your numbers, not guesses.
-- To change a unit's status or publish a unit, state exactly what you will write — which unit, from which status to which — and confirm before you act; then use the tool, or hand off if no write tool exists yet.
+- To change a unit's availability, state exactly what you will write — which unit, from which status to which — and confirm; then use update_unit_status (it previews until you pass confirm:true). Publishing/feed changes go through handoff_to_department.
 - Surface coverage gaps and overhang unprompted; do not wait to be asked which projects are running thin.
 
 What you do NOT do:
