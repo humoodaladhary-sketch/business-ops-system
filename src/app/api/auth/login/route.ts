@@ -16,7 +16,10 @@ const Schema = z.object({ email: z.string().email(), password: z.string().min(1)
 const ADMIN_EMAILS = ["ceo@alwalaaoman.com", "admin@alwalaaoman.com", "humood@alwalaaoman.com"];
 
 function previewSession(email: string, password: string): Session | null {
-  if (password !== (process.env.DEMO_PASSWORD || "alwalaa2026")) return null;
+  // Preview login only exists when DEMO_PASSWORD is explicitly set — this repo
+  // is public, so a hardcoded fallback password would be a published credential.
+  const demoPassword = process.env.DEMO_PASSWORD;
+  if (!demoPassword || password !== demoPassword) return null;
   const e = email.toLowerCase().trim();
   if (ADMIN_EMAILS.includes(e)) return { userId: "ceo", email: e, name: "Super Admin", role: "ADMIN", agentId: null };
   const local = e.split("@")[0];
@@ -36,9 +39,11 @@ export async function POST(req: NextRequest) {
   // preview state while auth is being wired. It issues a demo admin cookie;
   // getSession() falls back to that cookie even in Supabase mode, so it works
   // in both. Gated to the single owner email + a recovery password.
+  // Active only when OWNER_RECOVERY_PASSWORD is explicitly set in the env —
+  // never from a value committed to this public repo.
   const recoveryEmail = (process.env.OWNER_EMAIL || "humood@alwalaaoman.com").toLowerCase();
-  const recoveryPassword = process.env.OWNER_RECOVERY_PASSWORD || "Walaa-CEO-Access-2026";
-  if (emailNorm === recoveryEmail && password === recoveryPassword) {
+  const recoveryPassword = process.env.OWNER_RECOVERY_PASSWORD;
+  if (recoveryPassword && emailNorm === recoveryEmail && password === recoveryPassword) {
     const session: Session = { userId: "ceo", email: recoveryEmail, name: "Humood AlAdhari", role: "ADMIN", agentId: null };
     const res = NextResponse.json({ ok: true, recovery: true });
     res.cookies.set(DEMO_COOKIE, JSON.stringify(session), {
