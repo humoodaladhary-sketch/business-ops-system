@@ -33,7 +33,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
 // Short labels + the four primary destinations for the mobile bottom bar.
 const SHORT: Record<string, string> = {
   "/": "Home",
-  "/war-room": "War Room",
+  "/war-room": "Pro Mode",
   "/departments": "Copilots",
   "/leads": "Leads",
   "/inventory": "Inventory",
@@ -66,54 +66,64 @@ export function Shell({
 
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const roleLabel = user.role === "ADMIN" ? "CEO · Owner" : "Advisor";
-  // In War Room, the first bottom-nav slot becomes the War Room itself.
+  // In Pro Mode, the first bottom-nav slot becomes Pro Mode itself.
   const primaryHrefs = pro ? ["/war-room", "/departments", "/leads", "/inventory"] : PRIMARY;
   const primaryLinks = primaryHrefs.map((h) => links.find((l) => l.href === h)).filter(Boolean) as { href: string; label: string }[];
 
   return (
     <div className="min-h-screen md:flex">
-      {/* ---------------- Desktop sidebar ---------------- */}
-      <aside className="sticky top-0 z-40 hidden h-screen w-64 shrink-0 flex-col border-r border-hairline bg-ink-900/95 backdrop-blur md:flex print:hidden">
-        <div className="flex items-center justify-center border-b border-hairline px-5 py-5">
-          <Image src="/alwalaa-logo-white.png" alt="Alwalaa Real Estate" width={120} height={120} priority className="h-12 w-auto" />
-        </div>
-        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
-          {links.map((l) => {
-            const active = isActive(l.href);
-            const Icon = ICONS[l.href] ?? LayoutDashboard;
-            return (
-              <Link
-                key={l.href}
-                href={l.href}
-                prefetch={false}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition",
-                  active ? "bg-gold/15 text-gold ring-1 ring-gold/20" : "text-white/60 hover:bg-white/5 hover:text-white",
-                )}
-              >
-                <Icon className="h-[18px] w-[18px] shrink-0" />
-                {l.label}
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="border-t border-hairline p-3">
-          <div className="mb-2 flex items-center gap-3 rounded-xl bg-ink-100/60 px-3 py-2.5">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gold/15 text-sm font-semibold text-gold">
+      {/* ---------------- Desktop rail (OBB-portal style, Alwalaa palette) ----------------
+          A floating cream icon rail: logo mark on top, icon-only nav with hover
+          labels, the owner avatar + sign-out pinned at the bottom. */}
+      <aside className="sticky top-0 z-40 hidden h-screen shrink-0 py-4 ps-4 md:block print:hidden">
+        <div className="flex h-full w-[78px] flex-col items-center rounded-[26px] bg-cream py-4 shadow-2xl">
+          <Link href="/" aria-label="Alwalaa OS home" className="grid h-12 w-12 place-items-center rounded-2xl bg-ink">
+            <Image src="/alwalaa-mark.png" alt="Alwalaa Real Estate" width={64} height={64} priority className="h-8 w-auto" />
+          </Link>
+          <nav className="mt-4 flex w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-2 py-1" aria-label="Primary">
+            {links.map((l) => {
+              const active = isActive(l.href);
+              const Icon = ICONS[l.href] ?? LayoutDashboard;
+              return (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  prefetch={false}
+                  aria-current={active ? "page" : undefined}
+                  aria-label={l.label}
+                  className={cn(
+                    "group relative grid h-11 w-11 shrink-0 place-items-center rounded-xl transition",
+                    active
+                      ? "bg-gold/20 text-gold-deep ring-1 ring-gold/40"
+                      : "text-[#15131173] hover:bg-[#1513110d] hover:text-[#151311]",
+                  )}
+                >
+                  <Icon className="h-[19px] w-[19px]" />
+                  <span className="pointer-events-none absolute start-full top-1/2 z-50 ms-3 -translate-y-1/2 whitespace-nowrap rounded-lg bg-ink px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                    {l.label}
+                  </span>
+                </Link>
+              );
+            })}
+          </nav>
+          <div className="mt-2 flex flex-col items-center gap-1 border-t border-[#15131114] pt-3">
+            <span
+              title={`${user.name} — ${roleLabel}`}
+              className="grid h-10 w-10 place-items-center rounded-full bg-gold/20 text-sm font-semibold text-gold-deep"
+            >
               {initials(user.name)}
             </span>
-            <span className="min-w-0">
-              <span className="block truncate text-sm text-white/85">{user.name}</span>
-              <span className="block text-[10px] uppercase tracking-wide text-gold/70">{roleLabel}</span>
-            </span>
+            <a
+              href="/api/auth/signout"
+              aria-label="Sign out"
+              className="group relative grid h-10 w-10 place-items-center rounded-xl text-[#15131159] transition hover:bg-[#1513110d] hover:text-[#151311]"
+            >
+              <LogOut className="h-[18px] w-[18px]" />
+              <span className="pointer-events-none absolute start-full top-1/2 z-50 ms-3 -translate-y-1/2 whitespace-nowrap rounded-lg bg-ink px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                Sign out
+              </span>
+            </a>
           </div>
-          <a
-            href="/api/auth/signout"
-            className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-white/60 hover:bg-white/5 hover:text-gold"
-          >
-            <LogOut className="h-4 w-4" /> Sign out
-          </a>
         </div>
       </aside>
 
