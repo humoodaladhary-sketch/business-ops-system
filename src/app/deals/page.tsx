@@ -5,6 +5,9 @@ import { formatOMR } from "../lib/format";
 import { DealsTable } from "./DealsTable";
 import { requireSession, isAdmin } from "@/infrastructure/auth/session";
 
+// Business data must be read at request time, never frozen into the build.
+export const dynamic = "force-dynamic";
+
 export const metadata = { title: "Deals · Alwalaa CRM" };
 
 export default async function DealsPage() {

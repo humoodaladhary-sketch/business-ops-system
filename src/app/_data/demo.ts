@@ -17,6 +17,20 @@ import type { DataBundle } from "./source";
 
 export const DEMO_PERIOD = DASHBOARD_PERIOD;
 
+/**
+ * The period a dashboard should score. Snapshot data pins the curated
+ * DASHBOARD_PERIOD; live data scores the latest month with a closed deal
+ * (falling back to the current month before the first close lands).
+ */
+export function dashboardPeriod(data: DataBundle, now = new Date()): string {
+  if (!data.live) return DEMO_PERIOD;
+  const periods = data.deals
+    .filter((d) => d.stage === "CLOSED_WON" && d.period)
+    .map((d) => d.period)
+    .sort();
+  return periods[periods.length - 1] ?? now.toISOString().slice(0, 7);
+}
+
 function prevPeriod(period: string): string {
   const [y, m] = period.split("-").map(Number);
   const d = new Date(Date.UTC(y, m - 2, 1));
@@ -81,10 +95,10 @@ function buildAgent(data: DataBundle, agentId: string, period: string): DemoAgen
   };
 }
 
-export function getDemoAgents(data: DataBundle): DemoAgentView[] {
+export function getDemoAgents(data: DataBundle, period = dashboardPeriod(data)): DemoAgentView[] {
   return data.agents
     .filter((a) => ["SENIOR", "ADVISOR", "NEW"].includes(a.role) && a.status !== "FORMER")
-    .map((a) => buildAgent(data, a.id, DEMO_PERIOD));
+    .map((a) => buildAgent(data, a.id, period));
 }
 
 export interface CommissionRow {
@@ -102,10 +116,10 @@ export interface CommissionRow {
   source: string;
 }
 
-export function getDemoCommissions(data: DataBundle): CommissionRow[] {
+export function getDemoCommissions(data: DataBundle, period = dashboardPeriod(data)): CommissionRow[] {
   const name = new Map(data.agents.map((a) => [a.id, a.name]));
   return data.deals
-    .filter((d) => d.period === DEMO_PERIOD && d.stage === "CLOSED_WON")
+    .filter((d) => d.period === period && d.stage === "CLOSED_WON")
     .map((d) => ({
       dealId: d.id,
       agentId: d.agentId,

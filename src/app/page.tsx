@@ -4,21 +4,38 @@ import {
   ArrowDownRight, ArrowUpRight, ArrowRight, AlertTriangle, Eye, Coins, Wallet, Landmark, Target,
 } from "lucide-react";
 import { computePace } from "@/domain";
-import { getDemoAgents, DEMO_PERIOD } from "./_data/demo";
+import { getDemoAgents, dashboardPeriod } from "./_data/demo";
 import { teamTotals, bucketize, dealsFor } from "./_data/analytics";
 import { loadData } from "./_data/source";
+import { loadFinanceSummary } from "./_data/live";
 import { Card, SectionTitle, Badge, ProgressBar } from "./components/ui";
 import { TierProgress } from "./components/TierProgress";
 import { formatOMR, formatPct } from "./lib/format";
 import { cn } from "./lib/cn";
 
+// Business data must be read at request time, never frozen into the build.
+export const dynamic = "force-dynamic";
+
 // Demo snapshot is taken ~3/4 through the month for a meaningful pace read.
-const DAY_OF_MONTH = 20;
-const DAYS_IN_MONTH = 28;
+const SNAPSHOT_DAY_OF_MONTH = 20;
+const SNAPSHOT_DAYS_IN_MONTH = 28;
+
+// Where "today" sits inside the scored period: live current month uses the
+// real clock, a completed live month reads as fully elapsed, and the baked
+// snapshot keeps its curated mid-month pace read.
+function paceClock(live: boolean, period: string, now = new Date()): { day: number; days: number } {
+  if (!live) return { day: SNAPSHOT_DAY_OF_MONTH, days: SNAPSHOT_DAYS_IN_MONTH };
+  const [y, m] = period.split("-").map(Number);
+  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const current = now.toISOString().slice(0, 7) === period;
+  return { day: current ? now.getUTCDate() : days, days };
+}
 
 export default async function ExecutiveCockpit() {
-  const data = await loadData();
-  const agents = getDemoAgents(data);
+  const [data, finance] = await Promise.all([loadData(), loadFinanceSummary()]);
+  const period = dashboardPeriod(data);
+  const { day: dayOfMonth, days: daysInMonth } = paceClock(data.live, period);
+  const agents = getDemoAgents(data, period);
   const scoring = agents.filter((a) => a.result.targetAmount > 0);
 
   // Month view (period-scoped) — same computations the dashboard already trusted.
@@ -39,7 +56,7 @@ export default async function ExecutiveCockpit() {
 
   // Momentum: this month vs last, from the existing monthly aggregation.
   const monthly = bucketize(dealsFor(data, "ALL"), "month");
-  const curIdx = monthly.findIndex((b) => b.key === DEMO_PERIOD);
+  const curIdx = monthly.findIndex((b) => b.key === period);
   const cur = curIdx >= 0 ? monthly[curIdx] : monthly[monthly.length - 1];
   const prev = cur ? monthly[monthly.indexOf(cur) - 1] : undefined;
 
@@ -67,6 +84,8 @@ export default async function ExecutiveCockpit() {
     attention.push({ tone: "gold", icon: Landmark, title: `${formatOMR(totals.alwalaaReceivable, true)} to collect`, detail: "Developer commission not yet received", href: "/commissions" });
   if (totals.pendingAgent > 0)
     attention.push({ tone: "gold", icon: Wallet, title: `${formatOMR(totals.pendingAgent, true)} owed to agents`, detail: "Payouts pending release", href: "/commissions" });
+  if (finance && finance.overdueCount > 0)
+    attention.push({ tone: "risk", icon: AlertTriangle, title: `${finance.overdueCount} overdue invoice${finance.overdueCount === 1 ? "" : "s"}`, detail: `${formatOMR(finance.overdueOMR, true)} past due — chase collections`, href: "/departments/finance" });
 
   return (
     <div className="space-y-8">
@@ -76,10 +95,10 @@ export default async function ExecutiveCockpit() {
           <p className="text-[11px] uppercase tracking-[0.22em] text-gold/70">Executive cockpit</p>
           <h1 className="mt-1 font-heading text-4xl text-white">Command Center</h1>
           <p className="mt-1 text-white/50">
-            Period {DEMO_PERIOD} · team pace, momentum, and what needs your call — recomputed on every close.
+            Period {period} · team pace, momentum, and what needs your call — recomputed on every close.
           </p>
         </div>
-        <Badge variant="gold">Provisional · live</Badge>
+        <Badge variant={data.live ? "gold" : "watch"}>{data.live ? "Live · Supabase" : "Snapshot · not live"}</Badge>
       </div>
 
       {/* Hero KPI row */}
@@ -88,6 +107,21 @@ export default async function ExecutiveCockpit() {
           <Kpi key={k.label} {...k} />
         ))}
       </div>
+
+      {/* Cash reality — live from the Zoho Books sync */}
+      {finance && (
+        <div>
+          <SectionTitle sub="Live from Zoho Books — the same numbers the Finance copilot quotes.">
+            Cash reality
+          </SectionTitle>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <Kpi icon={Landmark} label="Invoiced (all time)" value={formatOMR(finance.invoicedOMR, true)} hint={`${finance.invoiceCount} commission invoices`} href="/departments/finance" />
+            <Kpi icon={Coins} label="Collected" value={formatOMR(finance.collectedOMR, true)} hint="recorded collections" href="/departments/finance" />
+            <Kpi icon={Wallet} label="Outstanding" value={formatOMR(finance.outstandingOMR, true)} hint="invoiced, not yet collected" href="/departments/finance" accent />
+            <Kpi icon={AlertTriangle} label="Overdue" value={formatOMR(finance.overdueOMR, true)} hint={`${finance.overdueCount} invoices past due`} href="/departments/finance" />
+          </div>
+        </div>
+      )}
 
       {/* Momentum — this month vs last */}
       {momentum.length > 0 && (
@@ -130,8 +164,8 @@ export default async function ExecutiveCockpit() {
               const pace = computePace({
                 volumeClosed: a.result.volumeClosed,
                 targetAmount: a.result.targetAmount,
-                dayOfMonth: DAY_OF_MONTH,
-                daysInMonth: DAYS_IN_MONTH,
+                dayOfMonth,
+                daysInMonth,
               });
               return (
                 <div key={a.id} className="flex items-center gap-3">

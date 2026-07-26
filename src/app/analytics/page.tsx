@@ -5,6 +5,9 @@ import { AnalyticsClient } from "./AnalyticsClient";
 import { requireSession, isAdmin } from "@/infrastructure/auth/session";
 import { loadData } from "../_data/source";
 
+// Business data must be read at request time, never frozen into the build.
+export const dynamic = "force-dynamic";
+
 export const metadata = { title: "Analytics · Alwalaa CRM" };
 
 export default async function AnalyticsPage() {

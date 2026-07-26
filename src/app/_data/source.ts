@@ -1,7 +1,7 @@
-// Single data source for the dashboards. Reads live data from the database once
-// it has been synced from Google Sheets; otherwise falls back to the baked
-// snapshot so the app always works. Pages call loadData() and pass the bundle
-// to the (pure) compute helpers and client tables.
+// Single data source for the dashboards. Priority: live Supabase (the system
+// of record the syncs and copilots use) → Prisma (legacy direct Postgres) →
+// the baked snapshot, so the app always works. Pages call loadData() and pass
+// the bundle to the (pure) compute helpers and client tables.
 import { hasDatabase, prisma } from "@/infrastructure/prisma/client";
 import { getTargetOverrides } from "./runtimeConfig";
 import {
@@ -39,6 +39,14 @@ function defaultTarget(role: string): number {
 }
 
 export async function loadData(): Promise<DataBundle> {
+  // Supabase is the system of record; use it whenever it has real CRM rows.
+  try {
+    const { loadLiveBundle } = await import("./live");
+    const live = await loadLiveBundle();
+    if (live) return withTargetOverrides(live);
+  } catch {
+    // fall through to Prisma / snapshot
+  }
   if (!hasDatabase) return withTargetOverrides(STATIC);
   try {
     const [dbAgents, dbDeals, dbLeads, targets] = await Promise.all([

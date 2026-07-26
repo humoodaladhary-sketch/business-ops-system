@@ -1,12 +1,17 @@
-import { getDemoCommissions, DEMO_PERIOD } from "../_data/demo";
+import { getDemoCommissions, dashboardPeriod } from "../_data/demo";
 import { Card, SectionTitle, StatTile, Badge } from "../components/ui";
 import { formatOMR, formatRate } from "../lib/format";
 import { requireSession, isAdmin } from "@/infrastructure/auth/session";
 import { loadData } from "../_data/source";
 
+// Business data must be read at request time, never frozen into the build.
+export const dynamic = "force-dynamic";
+
 export default async function CommissionsPage() {
   const session = await requireSession();
-  const all = getDemoCommissions(await loadData());
+  const data = await loadData();
+  const period = dashboardPeriod(data);
+  const all = getDemoCommissions(data, period);
   const rows = isAdmin(session) ? all : all.filter((r) => r.agentId === session.agentId);
   const totalGross = rows.reduce((s, r) => s + r.alwalaaGross, 0);
   const totalPayout = rows.reduce((s, r) => s + r.agentPayout, 0);
@@ -15,7 +20,7 @@ export default async function CommissionsPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-4xl text-white">Commissions &amp; Payouts</h1>
-        <p className="mt-1 text-white/50">Period {DEMO_PERIOD} · provisional, locks to final at month-close.</p>
+        <p className="mt-1 text-white/50">Period {period} · provisional, locks to final at month-close.</p>
       </div>
 
       <Card className="text-sm text-white/70">

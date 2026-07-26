@@ -5,6 +5,9 @@ import { formatOMR } from "../lib/format";
 import { requireSession } from "@/infrastructure/auth/session";
 import { loadData } from "../_data/source";
 
+// Business data must be read at request time, never frozen into the build.
+export const dynamic = "force-dynamic";
+
 export const metadata = { title: "Agents · Alwalaa CRM" };
 
 const ROLE_LABEL: Record<string, string> = {

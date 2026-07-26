@@ -1,11 +1,16 @@
-import { getDemoAgents, DEMO_PERIOD } from "../_data/demo";
+import { getDemoAgents, dashboardPeriod } from "../_data/demo";
 import { loadData } from "../_data/source";
 import { SectionTitle, Card } from "../components/ui";
 import { TierProgress } from "../components/TierProgress";
 import { PerformanceChart, type PerfDatum } from "../components/PerformanceChart";
 
+// Business data must be read at request time, never frozen into the build.
+export const dynamic = "force-dynamic";
+
 export default async function PerformancePage() {
-  const agents = getDemoAgents(await loadData()).filter((a) => a.result.targetAmount > 0);
+  const data = await loadData();
+  const period = dashboardPeriod(data);
+  const agents = getDemoAgents(data, period).filter((a) => a.result.targetAmount > 0);
 
   const chartData: PerfDatum[] = agents.map((a) => ({
     name: a.name.split(" ")[0],
@@ -17,7 +22,7 @@ export default async function PerformancePage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-4xl text-white">Performance vs Target</h1>
-        <p className="mt-1 text-white/50">Period {DEMO_PERIOD} · closed volume against each advisor&apos;s monthly target.</p>
+        <p className="mt-1 text-white/50">Period {period} · closed volume against each advisor&apos;s monthly target.</p>
       </div>
 
       <Card>

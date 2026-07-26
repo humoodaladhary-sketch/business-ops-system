@@ -1,12 +1,17 @@
 import { computeAgentOfMonth, computeOverachievers, type AgentMonth } from "@/domain";
-import { getDemoAgents, DEMO_PERIOD } from "../_data/demo";
+import { getDemoAgents, dashboardPeriod } from "../_data/demo";
 import { loadData } from "../_data/source";
 import { Leaderboard, type LeaderRow } from "../components/Leaderboard";
 import { SectionTitle, Card, Badge } from "../components/ui";
 import { formatOMR } from "../lib/format";
 
+// Business data must be read at request time, never frozen into the build.
+export const dynamic = "force-dynamic";
+
 export default async function LeaderboardPage() {
-  const agents = getDemoAgents(await loadData());
+  const data = await loadData();
+  const period = dashboardPeriod(data);
+  const agents = getDemoAgents(data, period);
 
   const rows: LeaderRow[] = agents
     .map((a) => ({
@@ -38,7 +43,7 @@ export default async function LeaderboardPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-4xl text-white">Leaderboard</h1>
-        <p className="mt-1 text-white/50">Period {DEMO_PERIOD} · ranked by % of personal monthly target.</p>
+        <p className="mt-1 text-white/50">Period {period} · ranked by % of personal monthly target.</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
