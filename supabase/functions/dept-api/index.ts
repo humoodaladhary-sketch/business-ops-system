@@ -7,7 +7,9 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const ORG = "6a32be59-155d-4662-9058-3a74fb2b6872";
-const TOKEN = "6e9342e74d7a4eb39720441a504ef6f33ba2c091638d3c85";
+// SECRET — set via `supabase secrets set DEPT_API_TOKEN=...`. Fails closed when
+// unset: this repo is public, so the token must never appear in code.
+const TOKEN = Deno.env.get("DEPT_API_TOKEN") ?? "";
 const MODEL = Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-5";
 const cors = { "content-type": "application/json", "access-control-allow-origin": "*", "access-control-allow-headers": "content-type,x-sync-token" };
 
@@ -180,6 +182,7 @@ async function chat(db: DB, dept: string, messages: unknown[]) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (!TOKEN) return new Response(JSON.stringify({ error: "not_configured", detail: "DEPT_API_TOKEN secret is not set" }), { status: 503, headers: cors });
   if (req.headers.get("x-sync-token") !== TOKEN) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
   let body: { action?: string; department?: string; messages?: unknown[] };
   try { body = await req.json(); } catch { return new Response(JSON.stringify({ error: "bad json" }), { status: 400, headers: cors }); }

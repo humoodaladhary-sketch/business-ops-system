@@ -9,7 +9,9 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const ORG_ID = "6a32be59-155d-4662-9058-3a74fb2b6872";
-const SYNC_TOKEN = "6e9342e74d7a4eb39720441a504ef6f33ba2c091638d3c85";
+// SECRET — set via `supabase secrets set ZOHO_SYNC_TOKEN=...` and mirror it in
+// the n8n workflow's x-sync-token header. Fails closed when unset.
+const SYNC_TOKEN = Deno.env.get("ZOHO_SYNC_TOKEN") ?? "";
 
 const STATUS_MAP: Record<string, string> = {
   draft: "draft", sent: "sent", viewed: "sent", overdue: "overdue",
@@ -24,6 +26,9 @@ const period = (date: string | null): string | null => (date ? date.slice(0, 7) 
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return Response.json({ error: "POST only" }, { status: 405 });
+  if (!SYNC_TOKEN) {
+    return Response.json({ error: "not_configured", detail: "ZOHO_SYNC_TOKEN secret is not set" }, { status: 503 });
+  }
   if (req.headers.get("x-sync-token") !== SYNC_TOKEN) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }

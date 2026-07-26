@@ -31,9 +31,9 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const ORG_ID = "6a32be59-155d-4662-9058-3a74fb2b6872";
 
 // Same secret style as zoho-ingest's x-sync-token, read from the SHEETS_INGEST_TOKEN
-// secret. The literal fallback is a placeholder so an unconfigured deploy fails closed.
-const SHEETS_INGEST_TOKEN = Deno.env.get("SHEETS_INGEST_TOKEN") ??
-  "REPLACE_WITH_SHEETS_INGEST_TOKEN";
+// secret. Empty when unset — the request handler rejects with 503 (a literal
+// placeholder fallback would itself be a guessable token).
+const SHEETS_INGEST_TOKEN = Deno.env.get("SHEETS_INGEST_TOKEN") ?? "";
 
 // ─── tiny value coercers (same helpers as zoho-ingest) ───────────────────────
 type Row = Record<string, unknown>;
@@ -374,6 +374,9 @@ const MAPPERS: Record<string, EntitySpec> = {
 // ═════════════════════════════════════════════════════════════════════════════
 Deno.serve(async (req) => {
   if (req.method !== "POST") return Response.json({ error: "POST only" }, { status: 405 });
+  if (!SHEETS_INGEST_TOKEN) {
+    return Response.json({ error: "not_configured", detail: "SHEETS_INGEST_TOKEN secret is not set" }, { status: 503 });
+  }
   if (req.headers.get("x-sync-token") !== SHEETS_INGEST_TOKEN) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
