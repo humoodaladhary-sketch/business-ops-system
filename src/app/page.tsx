@@ -1,15 +1,15 @@
 import type { ComponentType } from "react";
 import Link from "next/link";
 import {
-  ArrowDownRight, ArrowUpRight, ArrowRight, AlertTriangle, Eye, Coins, Wallet, Landmark, Target,
+  ArrowUpRight, AlertTriangle, BarChart3, Building2, CalendarX2, FileText, Map,
+  Megaphone, Sparkles, Swords, TrendingUp, Users, Wallet,
 } from "lucide-react";
 import { computePace } from "@/domain";
 import { getDemoAgents, dashboardPeriod } from "./_data/demo";
-import { teamTotals, bucketize, dealsFor } from "./_data/analytics";
 import { loadData } from "./_data/source";
 import { loadFinanceSummary } from "./_data/live";
-import { Card, SectionTitle, Badge, ProgressBar } from "./components/ui";
-import { TierProgress } from "./components/TierProgress";
+import { loadInboxTasks, loadUnitCounts } from "./_data/portal";
+import { PortalHero, type HeroSlide } from "./components/PortalHero";
 import { formatOMR, formatPct } from "./lib/format";
 import { cn } from "./lib/cn";
 
@@ -20,9 +20,6 @@ export const dynamic = "force-dynamic";
 const SNAPSHOT_DAY_OF_MONTH = 20;
 const SNAPSHOT_DAYS_IN_MONTH = 28;
 
-// Where "today" sits inside the scored period: live current month uses the
-// real clock, a completed live month reads as fully elapsed, and the baked
-// snapshot keeps its curated mid-month pace read.
 function paceClock(live: boolean, period: string, now = new Date()): { day: number; days: number } {
   if (!live) return { day: SNAPSHOT_DAY_OF_MONTH, days: SNAPSHOT_DAYS_IN_MONTH };
   const [y, m] = period.split("-").map(Number);
@@ -31,306 +28,282 @@ function paceClock(live: boolean, period: string, now = new Date()): { day: numb
   return { day: current ? now.getUTCDate() : days, days };
 }
 
-export default async function ExecutiveCockpit() {
-  const [data, finance] = await Promise.all([loadData(), loadFinanceSummary()]);
+// The launcher — six copilots + the system surfaces, OBB-portal style tiles
+// re-keyed to the Alwalaa palette (each department keeps its accent hue).
+type IconType = ComponentType<{ className?: string }>;
+interface Tile { href: string; title: string; sub: string; icon: IconType; grad: string }
+
+const DEPT_TILES: Tile[] = [
+  { href: "/departments/sales", title: "Sales", sub: "Pipeline, leads and closings", icon: TrendingUp, grad: "from-emerald-700 to-teal-950" },
+  { href: "/departments/marketing", title: "Marketing", sub: "Sources, content and campaigns", icon: Megaphone, grad: "from-fuchsia-700 to-purple-950" },
+  { href: "/departments/finance", title: "Finance", sub: "Invoices, collections, payouts", icon: Wallet, grad: "from-[#D7A52C] to-[#7a5326]" },
+  { href: "/departments/hr", title: "HR & Admin", sub: "Staff, leave and contracts", icon: Users, grad: "from-sky-700 to-blue-950" },
+  { href: "/departments/inventory", title: "Inventory", sub: "Units, availability, stock", icon: Building2, grad: "from-orange-600 to-amber-900" },
+  { href: "/departments/expert", title: "Expert Mode", sub: "Match, ROI case, pitch", icon: Sparkles, grad: "from-[#3a2f1f] to-[#151311]" },
+];
+
+const SYSTEM_TILES: Tile[] = [
+  { href: "/war-room", title: "War Room", sub: "Calculators, offers, ITC map", icon: Swords, grad: "from-red-800 to-rose-950" },
+  { href: "/war-room", title: "ITC Map", sub: "Zones, eligibility, briefs", icon: Map, grad: "from-teal-700 to-cyan-950" },
+  { href: "/reports", title: "Reports", sub: "Presentation-grade monthly", icon: FileText, grad: "from-stone-600 to-stone-900" },
+  { href: "/analytics", title: "Analytics", sub: "Agents, rankings, trends", icon: BarChart3, grad: "from-indigo-700 to-slate-950" },
+];
+
+export default async function PortalHome() {
+  const [data, finance, inbox, unitCounts] = await Promise.all([
+    loadData(),
+    loadFinanceSummary(),
+    loadInboxTasks(),
+    loadUnitCounts(),
+  ]);
   const period = dashboardPeriod(data);
   const { day: dayOfMonth, days: daysInMonth } = paceClock(data.live, period);
   const agents = getDemoAgents(data, period);
   const scoring = agents.filter((a) => a.result.targetAmount > 0);
 
-  // Month view (period-scoped) — same computations the dashboard already trusted.
   const teamVolume = scoring.reduce((s, a) => s + a.result.volumeClosed, 0);
   const teamTarget = scoring.reduce((s, a) => s + a.result.targetAmount, 0);
   const teamGross = agents.reduce((s, a) => s + a.result.alwalaaGrossMonth, 0);
   const teamPayout = agents.reduce((s, a) => s + a.result.projectedPayout, 0);
-  const netCommission = teamGross - teamPayout; // company's take, after agent splits
   const closings = agents.reduce((s, a) => s + a.result.dealCount, 0);
   const attainment = teamTarget ? teamVolume / teamTarget : 0;
-
-  // Running balances (all-time) from the analytics layer.
-  const totals = teamTotals(data); // { deals, volume, earned, pendingAgent, alwalaaReceivable }
-
   const atRisk = agents.filter((a) => a.atRisk.atRisk);
   const watch = agents.filter((a) => a.atRisk.watch && !a.atRisk.atRisk);
-  const flagged = agents.filter((a) => a.atRisk.atRisk || a.atRisk.watch);
 
-  // Momentum: this month vs last, from the existing monthly aggregation.
-  const monthly = bucketize(dealsFor(data, "ALL"), "month");
-  const curIdx = monthly.findIndex((b) => b.key === period);
-  const cur = curIdx >= 0 ? monthly[curIdx] : monthly[monthly.length - 1];
-  const prev = cur ? monthly[monthly.indexOf(cur) - 1] : undefined;
+  // Hero slides — every figure comes from live/loaded data; missing data means
+  // the slide simply doesn't exist.
+  const slides: HeroSlide[] = [];
+  if (finance) {
+    slides.push({
+      kicker: "Finance · live from Zoho Books",
+      title: `${formatOMR(finance.outstandingOMR, true)} outstanding to collect`,
+      body: `${formatOMR(finance.invoicedOMR, true)} invoiced across ${finance.invoiceCount} commission invoices · ${formatOMR(finance.collectedOMR, true)} recorded collected · ${finance.overdueCount} overdue worth ${formatOMR(finance.overdueOMR, true)}.`,
+      href: "/departments/finance",
+      cta: "Chase collections",
+      tone: finance.overdueCount > 0 ? "risk" : "gold",
+    });
+  }
+  const lastClose = data.deals
+    .filter((d) => d.stage === "CLOSED_WON" && d.closeDate)
+    .sort((a, b) => (a.closeDate! < b.closeDate! ? 1 : -1))[0];
+  if (lastClose) {
+    slides.push({
+      kicker: "Latest closing",
+      title: `${lastClose.client} — ${formatOMR(lastClose.value, true)}`,
+      body: `${lastClose.project} · ${lastClose.developer}${lastClose.unitNumber ? ` · unit ${lastClose.unitNumber}` : ""} · closed ${lastClose.closeDate}.`,
+      href: "/deals",
+      cta: "All deals",
+      tone: "gold",
+    });
+  }
+  const openLeads = data.leads.filter((l) => !["CLOSED_WON", "CLOSED_LOST"].includes(l.stage));
+  if (openLeads.length > 0) {
+    slides.push({
+      kicker: "Pipeline",
+      title: `${openLeads.length} investors in play`,
+      body: `Period ${period}: ${formatOMR(teamVolume, true)} closed of ${formatOMR(teamTarget, true)} target (${formatPct(attainment)}) · ${closings} closings.`,
+      href: "/pipeline",
+      cta: "Open pipeline",
+      tone: "ink",
+    });
+  }
+  if (unitCounts) {
+    const available = unitCounts.available ?? 0;
+    const total = Object.values(unitCounts).reduce((s, n) => s + n, 0);
+    slides.push({
+      kicker: "Inventory · live",
+      title: `${available} units available to sell`,
+      body: `${total} units tracked · ${unitCounts.reserved ?? 0} reserved · ${unitCounts.sold ?? 0} sold. The single source of truth for what Alwalaa can pitch today.`,
+      href: "/inventory",
+      cta: "Browse inventory",
+      tone: "bronze",
+    });
+  }
 
   const kpis = [
-    { icon: Coins, label: "Sales volume", value: formatOMR(teamVolume, true), hint: `${closings} closings this month`, href: "/performance", accent: true },
-    { icon: Wallet, label: "Net commission", value: formatOMR(netCommission, true), hint: "company, after agent splits", href: "/commissions" },
-    { icon: Landmark, label: "Cash to collect", value: formatOMR(totals.alwalaaReceivable, true), hint: "developer commission receivable", href: "/commissions" },
-    { icon: Target, label: "Attainment", value: formatPct(attainment), hint: `of ${formatOMR(teamTarget, true)} target`, href: "/leaderboard" },
+    { label: "Sales volume", value: formatOMR(teamVolume, true), hint: `${closings} closings · ${period}` },
+    { label: "Net commission", value: formatOMR(teamGross - teamPayout, true), hint: "company, after splits" },
+    { label: "Attainment", value: formatPct(attainment), hint: `of ${formatOMR(teamTarget, true)} target` },
+    ...(finance
+      ? [
+          { label: "Collected", value: formatOMR(finance.collectedOMR, true), hint: "recorded collections" },
+          { label: "Outstanding", value: formatOMR(finance.outstandingOMR, true), hint: `${finance.overdueCount} overdue`, accent: true },
+        ]
+      : []),
   ];
 
-  const momentum = cur
-    ? [
-        { label: "Closed volume", cur: cur.volume, prev: prev?.volume, money: true },
-        { label: "Deals closed", cur: cur.deals, prev: prev?.deals, money: false },
-        { label: "Commission booked", cur: cur.commission, prev: prev?.commission, money: true },
-      ]
-    : [];
-
-  const attention: AttentionProps[] = [];
-  if (atRisk.length)
-    attention.push({ tone: "risk", icon: AlertTriangle, title: `${atRisk.length} At Risk`, detail: atRisk.map((a) => a.name).join(", "), href: "/performance" });
-  if (watch.length)
-    attention.push({ tone: "watch", icon: Eye, title: `${watch.length} on Watch`, detail: `${watch.map((a) => a.name).join(", ")} — no closings this month`, href: "/performance" });
-  if (totals.alwalaaReceivable > 0)
-    attention.push({ tone: "gold", icon: Landmark, title: `${formatOMR(totals.alwalaaReceivable, true)} to collect`, detail: "Developer commission not yet received", href: "/commissions" });
-  if (totals.pendingAgent > 0)
-    attention.push({ tone: "gold", icon: Wallet, title: `${formatOMR(totals.pendingAgent, true)} owed to agents`, detail: "Payouts pending release", href: "/commissions" });
-  if (finance && finance.overdueCount > 0)
-    attention.push({ tone: "risk", icon: AlertTriangle, title: `${finance.overdueCount} overdue invoice${finance.overdueCount === 1 ? "" : "s"}`, detail: `${formatOMR(finance.overdueOMR, true)} past due — chase collections`, href: "/departments/finance" });
+  /* Light portal sheet styling (cream #FBF8F1, near-black #151311) */
+  const CARD = "rounded-2xl border border-[#15131114] bg-white/70 shadow-sm";
+  const MUTED = "text-[#151311a6]";
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="rounded-3xl bg-cream p-4 text-[#151311] shadow-2xl sm:p-6 lg:p-8">
+      {/* Portal header */}
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.22em] text-gold/70">Executive cockpit</p>
-          <h1 className="mt-1 font-heading text-4xl text-white">Command Center</h1>
-          <p className="mt-1 text-white/50">
-            Period {period} · team pace, momentum, and what needs your call — recomputed on every close.
-          </p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-[#9C6B3B]">Alwalaa OS</p>
+          <h1 className="mt-1 font-heading text-3xl sm:text-4xl">Command Portal</h1>
         </div>
-        <Badge variant={data.live ? "gold" : "watch"}>{data.live ? "Live · Supabase" : "Snapshot · not live"}</Badge>
+        <span
+          className={cn(
+            "rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide",
+            data.live ? "border-[#D7A52C66] bg-[#D7A52C1a] text-[#9C6B3B]" : "border-amber-500/40 bg-amber-500/10 text-amber-700",
+          )}
+        >
+          {data.live ? "Live · Supabase" : "Snapshot · not live"}
+        </span>
       </div>
 
-      {/* Hero KPI row */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {kpis.map((k) => (
-          <Kpi key={k.label} {...k} />
-        ))}
-      </div>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_330px]">
+        {/* ---------------- Main column ---------------- */}
+        <div className="min-w-0 space-y-6">
+          <PortalHero slides={slides} />
 
-      {/* Cash reality — live from the Zoho Books sync */}
-      {finance && (
-        <div>
-          <SectionTitle sub="Live from Zoho Books — the same numbers the Finance copilot quotes.">
-            Cash reality
-          </SectionTitle>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Kpi icon={Landmark} label="Invoiced (all time)" value={formatOMR(finance.invoicedOMR, true)} hint={`${finance.invoiceCount} commission invoices`} href="/departments/finance" />
-            <Kpi icon={Coins} label="Collected" value={formatOMR(finance.collectedOMR, true)} hint="recorded collections" href="/departments/finance" />
-            <Kpi icon={Wallet} label="Outstanding" value={formatOMR(finance.outstandingOMR, true)} hint="invoiced, not yet collected" href="/departments/finance" accent />
-            <Kpi icon={AlertTriangle} label="Overdue" value={formatOMR(finance.overdueOMR, true)} hint={`${finance.overdueCount} invoices past due`} href="/departments/finance" />
-          </div>
-        </div>
-      )}
-
-      {/* Momentum — this month vs last */}
-      {momentum.length > 0 && (
-        <div>
-          <SectionTitle sub={prev ? `${cur!.label} vs ${prev.label} — closed production, month over month.` : `${cur!.label} — closed production so far.`}>
-            Momentum
-          </SectionTitle>
-          <div className="grid gap-4 sm:grid-cols-3">
-            {momentum.map((m) => (
-              <MomentumCell key={m.label} {...m} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* What needs you — attention strip */}
-      <div>
-        <SectionTitle sub="Surfaced automatically from live flags and balances — act or delegate.">What needs you</SectionTitle>
-        {attention.length === 0 ? (
-          <Card>
-            <p className="text-sm text-white/50">All clear — no flags or outstanding balances need your attention.</p>
-          </Card>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {attention.map((a) => (
-              <AttentionItem key={a.title} {...a} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Pace + accountability */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <SectionTitle sub="Linear pace through the month — gold bar is actual, marker is where pace expects you.">
-            Pace check
-          </SectionTitle>
-          <Card className="space-y-3">
-            {scoring.map((a) => {
-              const pace = computePace({
-                volumeClosed: a.result.volumeClosed,
-                targetAmount: a.result.targetAmount,
-                dayOfMonth,
-                daysInMonth,
-              });
-              return (
-                <div key={a.id} className="flex items-center gap-3">
-                  <span className="w-36 shrink-0 text-sm text-white/70">{a.name}</span>
-                  <ProgressBar value={a.result.pctOfTarget} markers={[pace.expectedPct]} className="flex-1" />
-                  <span className="w-12 text-right text-sm tabular-nums text-white/60">
-                    {formatPct(a.result.pctOfTarget)}
-                  </span>
-                  <span className="w-20 text-right">
-                    {pace.aheadOfPace ? <Badge variant="good">ahead</Badge> : <Badge variant="watch">behind</Badge>}
-                  </span>
+          {/* KPI band */}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            {kpis.map((k) => (
+              <div key={k.label} className={cn(CARD, "p-4")}>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#15131180]">{k.label}</div>
+                <div className={cn("mt-2 font-heading text-2xl tabular-nums", "accent" in k && k.accent ? "text-[#9C6B3B]" : "")}>
+                  {k.value}
                 </div>
-              );
-            })}
-          </Card>
-        </div>
-
-        <div>
-          <SectionTitle sub="Auto-flagged; At Risk opens a CEO review task.">Accountability</SectionTitle>
-          <Card className="space-y-3">
-            {flagged.length === 0 && <p className="text-sm text-white/50">No flags this period.</p>}
-            {flagged.map((a) => (
-              <div key={a.id} className="rounded-lg border border-hairline bg-ink-900/40 p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-white">{a.name}</span>
-                  {a.atRisk.atRisk ? <Badge variant="risk">At Risk</Badge> : <Badge variant="watch">Watch</Badge>}
-                </div>
-                <p className="mt-1 text-xs text-white/50">{a.atRisk.reason}</p>
+                <div className={cn("mt-1 text-[11px]", MUTED)}>{k.hint}</div>
               </div>
             ))}
-            {agents
-              .filter((a) => a.inRampWindow || a.exempt)
-              .map((a) => (
-                <div key={a.id} className="flex items-center justify-between rounded-lg border border-hairline bg-ink-900/20 p-3">
-                  <span className="text-sm text-white/70">{a.name}</span>
-                  <Badge variant="muted">{a.exempt ? "Trainee · exempt" : "Ramp · exempt"}</Badge>
-                </div>
-              ))}
-          </Card>
-        </div>
-      </div>
+          </div>
 
-      {/* Live tier progress */}
-      <div>
-        <SectionTitle sub="The live comp plan — each advisor's next-tier nudge.">Live tier progress</SectionTitle>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {agents
-            .filter((a) => a.result.targetAmount > 0)
-            .map((a) => (
-              <TierProgress
-                key={a.id}
-                name={a.name}
-                role={a.role}
-                pct={a.result.pctOfTarget}
-                tierName={a.result.currentTier}
-                splitRate={a.result.currentSplitRate}
-                volume={a.result.volumeClosed}
-                target={a.result.targetAmount}
-                projectedPayout={a.result.projectedPayout}
-                nudge={a.nudge}
-              />
-            ))}
+          {/* Department launcher */}
+          <section>
+            <h2 className="mb-3 font-heading text-xl">Departments</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {DEPT_TILES.map((t) => (
+                <LauncherTile key={t.title} {...t} />
+              ))}
+            </div>
+          </section>
+
+          {/* System launcher */}
+          <section>
+            <h2 className="mb-3 font-heading text-xl">Workspace</h2>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {SYSTEM_TILES.map((t) => (
+                <LauncherTile key={t.title} {...t} compact />
+              ))}
+            </div>
+          </section>
         </div>
+
+        {/* ---------------- Rail ---------------- */}
+        <aside className="space-y-6">
+          {/* Waiting on you — cross-department handoffs */}
+          <div className={cn(CARD, "p-5")}>
+            <h2 className="font-heading text-xl">Waiting on you</h2>
+            <p className={cn("mt-0.5 text-[11px]", MUTED)}>Open cross-department handoffs</p>
+            {!inbox || inbox.length === 0 ? (
+              <div className="flex flex-col items-center py-10 text-center">
+                <span className="grid h-14 w-14 place-items-center rounded-full bg-[#1513110d]">
+                  <CalendarX2 className="h-7 w-7 text-[#15131159]" />
+                </span>
+                <p className="mt-4 font-heading text-lg">All clear</p>
+                <p className={cn("mt-1 text-xs", MUTED)}>
+                  {inbox ? "No open handoffs between departments." : "Connects once Supabase is configured."}
+                </p>
+              </div>
+            ) : (
+              <ul className="mt-4 space-y-3">
+                {inbox.map((t) => (
+                  <li key={t.id} className="rounded-xl border border-[#15131114] bg-white/80 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="min-w-0 truncate text-sm font-medium">{t.title}</span>
+                      {t.priority === "high" && (
+                        <span className="shrink-0 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-700">
+                          High
+                        </span>
+                      )}
+                    </div>
+                    <p className={cn("mt-1 text-[11px]", MUTED)}>
+                      {t.from_department} → {t.to_department} · {t.status}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Pace & flags */}
+          <div className={cn(CARD, "p-5")}>
+            <h2 className="font-heading text-xl">Pace &amp; flags</h2>
+            <p className={cn("mt-0.5 text-[11px]", MUTED)}>
+              Day {dayOfMonth}/{daysInMonth} of {period}
+            </p>
+            <div className="mt-4 space-y-3">
+              {scoring.map((a) => {
+                const pace = computePace({
+                  volumeClosed: a.result.volumeClosed,
+                  targetAmount: a.result.targetAmount,
+                  dayOfMonth,
+                  daysInMonth,
+                });
+                return (
+                  <div key={a.id}>
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="truncate font-medium">{a.name}</span>
+                      <span className={cn("shrink-0 tabular-nums", pace.aheadOfPace ? "text-emerald-700" : "text-[#9C6B3B]")}>
+                        {formatPct(a.result.pctOfTarget)} · {pace.aheadOfPace ? "ahead" : "behind"}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#15131114]">
+                      <div
+                        className="h-full rounded-full bg-[#D7A52C]"
+                        style={{ width: `${Math.min(100, Math.round(a.result.pctOfTarget * 100))}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+              {scoring.length === 0 && <p className={cn("text-xs", MUTED)}>No agents with targets this period.</p>}
+            </div>
+            {(atRisk.length > 0 || watch.length > 0) && (
+              <div className="mt-4 space-y-2 border-t border-[#15131114] pt-3">
+                {atRisk.map((a) => (
+                  <Link key={a.id} href="/performance" className="flex items-center gap-2 text-xs text-red-700 hover:underline">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {a.name} — at risk: {a.atRisk.reason}
+                  </Link>
+                ))}
+                {watch.map((a) => (
+                  <Link key={a.id} href="/performance" className="flex items-center gap-2 text-xs text-amber-700 hover:underline">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {a.name} — on watch
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </aside>
       </div>
     </div>
   );
 }
 
-// ---- Presentation-only helpers (server components) -------------------------
-
-type IconType = ComponentType<{ className?: string }>;
-
-function Kpi({
-  icon: Icon,
-  label,
-  value,
-  hint,
-  href,
-  accent,
-}: {
-  icon: IconType;
-  label: string;
-  value: string;
-  hint?: string;
-  href?: string;
-  accent?: boolean;
-}) {
-  const body = (
-    <>
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] uppercase tracking-wide text-white/45">{label}</span>
-        <Icon className={cn("h-4 w-4", accent ? "text-gold" : "text-white/30")} />
-      </div>
-      <div className={cn("mt-3 text-3xl font-semibold tabular-nums", accent ? "text-gold" : "text-white")}>{value}</div>
-      {hint ? <div className="mt-1 text-xs text-white/40">{hint}</div> : null}
-      {href ? (
-        <div className="mt-3 flex items-center gap-1 text-[11px] text-white/30 transition group-hover:text-gold">
-          Open <ArrowUpRight className="h-3 w-3" />
-        </div>
-      ) : null}
-    </>
-  );
-  const cls = cn(
-    "group rounded-xl border border-hairline p-5 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset] transition",
-    accent ? "bg-gradient-to-br from-gold/10 to-ink-100/60" : "bg-ink-100/60",
-    href && "hover:border-gold/40",
-  );
-  return href ? (
-    <Link href={href} className={cls}>
-      {body}
-    </Link>
-  ) : (
-    <div className={cls}>{body}</div>
-  );
-}
-
-function MomentumCell({ label, cur, prev, money }: { label: string; cur: number; prev?: number; money?: boolean }) {
-  const fmt = (n: number) => (money ? formatOMR(n, true) : String(n));
-  const diff = prev == null ? null : cur - prev;
-  const pct = prev != null && prev !== 0 ? (cur - prev) / prev : null;
-  const up = (diff ?? 0) >= 0;
-  return (
-    <Card className="flex flex-col gap-2">
-      <span className="text-[11px] uppercase tracking-wide text-white/45">{label}</span>
-      <span className="text-2xl font-semibold tabular-nums text-white">{fmt(cur)}</span>
-      {diff == null ? (
-        <span className="text-xs text-white/35">no prior month</span>
-      ) : (
-        <span className={cn("inline-flex items-center gap-1 text-xs font-medium", up ? "text-emerald-400" : "text-risk")}>
-          {up ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-          {up ? "+" : ""}
-          {fmt(diff)}
-          {pct != null ? <span className="text-white/40">· {up ? "+" : ""}{formatPct(pct)}</span> : null}
-        </span>
-      )}
-    </Card>
-  );
-}
-
-interface AttentionProps {
-  tone: "risk" | "watch" | "gold";
-  icon: IconType;
-  title: string;
-  detail: string;
-  href: string;
-}
-
-const ATTENTION_TONE: Record<AttentionProps["tone"], string> = {
-  risk: "border-risk/30 bg-risk/10 text-risk",
-  watch: "border-amber-400/30 bg-amber-500/10 text-amber-300",
-  gold: "border-gold/30 bg-gold/10 text-gold",
-};
-
-function AttentionItem({ tone, icon: Icon, title, detail, href }: AttentionProps) {
+// OBB-style gradient launcher tile: icon chip, title, subtitle, corner action.
+function LauncherTile({ href, title, sub, icon: Icon, grad, compact }: Tile & { compact?: boolean }) {
   return (
     <Link
       href={href}
-      className={cn("group flex items-start gap-3 rounded-xl border p-4 transition hover:brightness-125", ATTENTION_TONE[tone])}
+      className={cn(
+        "group relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-md transition hover:shadow-xl",
+        grad,
+        compact ? "min-h-[124px]" : "min-h-[150px]",
+      )}
     >
-      <Icon className="mt-0.5 h-5 w-5 shrink-0" />
-      <span className="min-w-0">
-        <span className="block text-sm font-semibold">{title}</span>
-        <span className="mt-0.5 block truncate text-xs text-white/55">{detail}</span>
+      <div aria-hidden className="pointer-events-none absolute -end-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+      <span className="grid h-10 w-10 place-items-center rounded-full bg-white/15">
+        <Icon className="h-5 w-5" />
       </span>
-      <ArrowRight className="ml-auto mt-0.5 h-4 w-4 shrink-0 opacity-0 transition group-hover:opacity-100" />
+      <div className={cn("font-heading", compact ? "mt-3 text-lg" : "mt-4 text-xl")}>{title}</div>
+      <p className="mt-0.5 max-w-[85%] text-xs leading-snug text-white/70">{sub}</p>
+      <span className="absolute bottom-4 end-4 grid h-9 w-9 place-items-center rounded-full bg-white/15 transition group-hover:bg-white/30">
+        <ArrowUpRight className="h-4 w-4" />
+      </span>
     </Link>
   );
 }
