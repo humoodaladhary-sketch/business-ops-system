@@ -117,6 +117,8 @@ const CATEGORY_LABEL: Record<UnitCategory, string> = {
   future_cities: "Future Cities",
   surooh: "Surooh",
 };
+/** Display labels for unit categories (shared with the Pro Mode UI). */
+export const CATEGORY_LABELS = CATEGORY_LABEL;
 
 /**
  * Composes the calculators into a client-ready offer.

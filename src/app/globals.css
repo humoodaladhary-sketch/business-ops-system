@@ -20,9 +20,10 @@
 }
 
 /* Pro / War-Room mode: the brand accent shifts gold -> crimson app-wide. */
+/* Pro / closing mode — refined deep garnet (was a brighter crimson). */
 :root[data-pro="on"] {
-  --gold: 229 72 77;
-  --gold-soft: 242 96 100;
+  --gold: 186 54 66;
+  --gold-soft: 214 92 102;
 }
 
 body {

@@ -22,6 +22,8 @@ import {
 } from "@/domain/realestate/offer";
 import { formatOMR } from "../../lib/format";
 import { Card } from "../../components/ui";
+import { UnitPicker } from "./UnitPicker";
+import type { LiveOfferUnit } from "../../_data/warRoomUnits";
 
 // ---------------------------------------------------------------------------
 // Option lists + display helpers
@@ -79,7 +81,7 @@ const TD = "border-b border-zinc-200 px-3 py-2 text-sm text-zinc-800";
 // Component
 // ---------------------------------------------------------------------------
 
-export function OfferBuilder({ units }: { units?: OfferUnit[] }) {
+export function OfferBuilder({ liveUnits, catalog }: { liveUnits: LiveOfferUnit[]; catalog: OfferUnit[] }) {
   // Client
   const [clientName, setClientName] = useState("");
   const [nationality, setNationality] = useState("");
@@ -101,23 +103,31 @@ export function OfferBuilder({ units }: { units?: OfferUnit[] }) {
   const [reservationOffer, setReservationOffer] = useState(false);
 
   // Prefill + result
-  const [prefillRef, setPrefillRef] = useState("");
+  const [catalogProject, setCatalogProject] = useState("");
   const [result, setResult] = useState<{ offer: Offer; input: OfferInput; issuedOn: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  /** Copy the unit fields from a chosen live unit into the form. */
-  function applyPrefill(ref: string) {
-    setPrefillRef(ref);
-    const u = units?.find((x) => x.reference === ref);
-    if (!u) return;
+  /** Copy every unit field from a picked live unit into the form. */
+  function applyLiveUnit(u: LiveOfferUnit) {
     setReference(u.reference);
     setProject(u.project);
     setDeveloper(u.developer);
     setUnitType(u.unitType);
-    setAreaSqm(String(u.areaSqm));
+    setAreaSqm(u.areaSqm > 0 ? String(u.areaSqm) : "");
     setPriceOmr(String(u.priceOmr));
     setCategory(u.category);
     setOwnershipEligibility(u.ownershipEligibility);
+  }
+
+  /** Catalog fallback (no live inventory): prefill the project facts only. */
+  function applyCatalogProject(name: string) {
+    setCatalogProject(name);
+    const p = catalog.find((x) => x.project === name);
+    if (!p) return;
+    setProject(p.project);
+    setDeveloper(p.developer);
+    setCategory(p.category);
+    setOwnershipEligibility(p.ownershipEligibility);
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -165,14 +175,22 @@ export function OfferBuilder({ units }: { units?: OfferUnit[] }) {
       {/* ----------------------------- FORM (screen only) ----------------------------- */}
       <Card className="print:hidden">
         <form onSubmit={onSubmit} className="space-y-5">
-          {units && units.length > 0 && (
+          {liveUnits.length > 0 ? (
+            <UnitPicker
+              units={liveUnits}
+              nationality={nationality}
+              onPick={applyLiveUnit}
+              title="Prefill from live inventory"
+              hint="click a unit to fill the form"
+            />
+          ) : (
             <div>
-              <label className={LABEL}>Prefill from live inventory</label>
-              <select className={FIELD} value={prefillRef} onChange={(e) => applyPrefill(e.target.value)}>
-                <option value="">— Choose a live unit —</option>
-                {units.map((u, i) => (
-                  <option key={`${u.reference}-${i}`} value={u.reference}>
-                    {u.reference} — {u.project} · {u.unitType}
+              <label className={LABEL}>Prefill project facts (catalog)</label>
+              <select className={FIELD} value={catalogProject} onChange={(e) => applyCatalogProject(e.target.value)}>
+                <option value="">— Choose a project —</option>
+                {catalog.map((p) => (
+                  <option key={p.project} value={p.project}>
+                    {p.project} · {p.category === "ITC" ? "ITC" : "GCC/Omani only"}
                   </option>
                 ))}
               </select>
