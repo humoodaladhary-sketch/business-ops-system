@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AGING_BUCKET_LABELS, OPEN_INVOICE_STATUSES, summarizeAging } from "@/domain/finance/aging";
+import { FOLLOWUP_REASON_LABELS, STAGE_FOLLOWUP_DAYS, summarizeFollowups } from "@/domain/crm/followup";
 
 // The single organization (owner-only mode).
 export const ORG_ID = "6a32be59-155d-4662-9058-3a74fb2b6872";
@@ -133,7 +134,53 @@ const salesTools: CopilotTool[] = [
   },
   listDealsTool,
 ];
-// (move_lead_stage is appended after the guarded write tools are defined below.)
+// (list_followup_queue and move_lead_stage are appended below.)
+
+// Follow-up nudges — deterministic staleness over recorded touches only (the
+// pipeline twin of the collections queue). A lead with no last_touch_at is
+// surfaced as "no touch recorded", never guessed into a staleness number.
+export const listFollowupQueueTool: CopilotTool = {
+  name: "list_followup_queue",
+  description:
+    "The pipeline follow-up queue: open leads whose last recorded touch is older than their stage's follow-up window (new/reservation 2d, viewing/negotiation 3d, qualified/engaged 7d), sorted worst first, plus leads with no touch recorded at all. Work from the top; leads with no recorded touch need a touch logged before their staleness can be judged.",
+  input_schema: { type: "object", properties: { limit: { type: "number" } } },
+  run: async (db, i) => {
+    const { data, error } = await db
+      .from("leads")
+      .select("id,name,stage,last_touch_at,registered_on,created_at")
+      .eq("organization_id", ORG_ID)
+      .not("external_id", "is", null);
+    if (error) return { error: error.message };
+    const rows = (data ?? []) as { id: string; name: string; stage: string; last_touch_at: string | null; registered_on: string | null; created_at: string | null }[];
+    const summary = summarizeFollowups(
+      rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        stage: r.stage,
+        lastTouch: r.last_touch_at,
+        registeredOn: r.registered_on ?? r.created_at,
+      })),
+      new Date(),
+    );
+    return {
+      open_lead_count: summary.openCount,
+      due_count: summary.dueCount,
+      stale_count: summary.staleCount,
+      no_touch_count: summary.noTouchCount,
+      due_by_stage: summary.byStage,
+      stage_windows_days: STAGE_FOLLOWUP_DAYS,
+      queue: summary.queue.slice(0, num(i.limit, 15, 50)).map((n) => ({
+        name: n.name,
+        stage: n.stage,
+        reason: FOLLOWUP_REASON_LABELS[n.reason],
+        days_since_touch: n.daysSinceTouch,
+        days_over_window: n.daysOverThreshold,
+        days_since_registered: n.daysSinceRegistered,
+      })),
+      note: "Stale = a verified touch older than the stage window. 'No touch recorded' means exactly that — the lead may or may not have been contacted; log the truth before judging it.",
+    };
+  },
+};
 
 const marketingTools: CopilotTool[] = [
   {
@@ -836,7 +883,7 @@ const expertTools: CopilotTool[] = [
 ];
 
 // Wire the guarded writes into their departments (Expert Mode stays read-only).
-salesTools.push(moveLeadStageTool);
+salesTools.push(listFollowupQueueTool, moveLeadStageTool);
 hrTools.push(decideLeaveRequestTool);
 financeTools.push(
   listCollectionQueueTool,
@@ -873,7 +920,7 @@ What you do:
 - Pull list_deals for closed deals with their value and agent payout whenever you report production, per-agent property value, or momentum.
 - Scan list_my_inbox for new WhatsApp-first leads and Lead Validation Form entries from referrals, Instagram, and portals (Dubizzle, OpenSooq) that need qualifying and routing.
 - Measure the team against its standing targets: 250,000 OMR/month in property value per agent, 3,000 OMR/month in net commission per agent, and about 10 new clients/month.
-- Watch pipeline hygiene — flag stale stages and overdue follow-ups the moment the stage data shows them.
+- Watch pipeline hygiene with list_followup_queue — the deterministic follow-up queue, worst first. Stale means a verified touch older than the stage's window (new/reservation 2d, viewing/negotiation 3d, qualified/engaged 7d); "no touch recorded" is its own class — never treat it as stale, get the real touch logged first.
 
 How you act (do-er + advisor):
 - Qualify and route incoming leads by source and fit, and prep prioritized, agent-by-agent follow-up lists.

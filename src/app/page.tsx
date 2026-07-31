@@ -4,8 +4,9 @@ import {
   ArrowUpRight, AlertTriangle, BarChart3, Building2, CalendarX2, FileText, Map,
   Megaphone, Sparkles, Swords, TrendingUp, Users, Wallet,
 } from "lucide-react";
-import { computePace } from "@/domain";
+import { computePace, STAGE_LABELS } from "@/domain";
 import { AGING_BUCKET_LABELS, type AgingBucket } from "@/domain/finance/aging";
+import { summarizeFollowups } from "@/domain/crm/followup";
 import { getDemoAgents, dashboardPeriod } from "./_data/demo";
 import { loadData } from "./_data/source";
 import { loadFinanceSummary } from "./_data/live";
@@ -115,6 +116,21 @@ export default async function PortalHome() {
       tone: "gold",
     });
   }
+  // Follow-up nudges run on live rows only — a snapshot's touch dates are
+  // frozen history and would fabricate staleness against today's clock.
+  const followups = data.live
+    ? summarizeFollowups(
+        data.leads.map((l) => ({
+          id: l.id,
+          name: l.name,
+          stage: l.stage,
+          lastTouch: l.lastFollowUp,
+          registeredOn: l.registeredOn,
+        })),
+        new Date(),
+      )
+    : null;
+
   const openLeads = data.leads.filter((l) => !["CLOSED_WON", "CLOSED_LOST"].includes(l.stage));
   if (openLeads.length > 0) {
     slides.push({
@@ -289,6 +305,67 @@ export default async function PortalHome() {
                 <p className={cn("mt-2 text-[10px]", MUTED)}>
                   {finance.aging.buckets.due_date_unverified.count} invoices have unverified due dates — set them (with the
                   contractual basis) before treating them as overdue.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Follow-up queue — pipeline twin of the collections chase */}
+          {followups && followups.dueCount > 0 && (
+            <div className={cn(CARD, "p-5")}>
+              <h2 className="font-heading text-xl">Follow-up queue</h2>
+              <p className={cn("mt-0.5 text-[11px]", MUTED)}>
+                {followups.dueCount} of {followups.openCount} open leads need a touch
+              </p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {followups.staleCount > 0 && (
+                  <span className="rounded-full border border-red-300 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-700">
+                    Stale: {followups.staleCount}
+                  </span>
+                )}
+                {followups.noTouchCount > 0 && (
+                  <span className="rounded-full border border-amber-400/50 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                    No touch recorded: {followups.noTouchCount}
+                  </span>
+                )}
+                {Object.entries(followups.byStage).map(([stage, count]) => (
+                  <span key={stage} className="rounded-full border border-[#15131121] px-2 py-0.5 text-[10px] font-medium text-[#151311a6]">
+                    {STAGE_LABELS[stage as keyof typeof STAGE_LABELS] ?? stage}: {count}
+                  </span>
+                ))}
+              </div>
+              <ul className="mt-4 space-y-2">
+                {followups.queue.slice(0, 3).map((n) => (
+                  <li key={n.id} className="rounded-xl border border-[#15131114] bg-white/80 p-3">
+                    <div className="flex items-baseline justify-between gap-2 text-sm">
+                      <span className="min-w-0 truncate font-medium">{n.name}</span>
+                      <span className={cn("shrink-0 text-[11px] font-semibold", MUTED)}>
+                        {STAGE_LABELS[n.stage] ?? n.stage}
+                      </span>
+                    </div>
+                    <p className={cn("mt-0.5 text-[11px]", MUTED)}>
+                      {n.reason === "stale" ? (
+                        <span className="font-semibold text-red-700">
+                          {n.daysSinceTouch} days since last touch · {n.daysOverThreshold} past the {n.thresholdDays}d window
+                        </span>
+                      ) : (
+                        <span className="font-semibold text-amber-700">
+                          No touch recorded{n.daysSinceRegistered != null ? ` · registered ${n.daysSinceRegistered}d ago` : ""}
+                        </span>
+                      )}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/departments/sales"
+                className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-[#9C6B3B] hover:underline"
+              >
+                Open Sales copilot to work the queue <ArrowUpRight className="h-3 w-3" />
+              </Link>
+              {followups.noTouchCount > 0 && (
+                <p className={cn("mt-2 text-[10px]", MUTED)}>
+                  &ldquo;No touch recorded&rdquo; means exactly that — log the real last contact before judging these stale.
                 </p>
               )}
             </div>
