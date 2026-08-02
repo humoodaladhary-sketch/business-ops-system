@@ -95,6 +95,12 @@ export interface ExitSummary {
   method: "appreciation" | "exit_cap";
   sellingCostsOmr: number;
   loanBalanceAtExitOmr: number;
+  /**
+   * Developer-plan instalments still owed AFTER the hold ends (selling before
+   * the plan completes). Settled out of the sale — the seller only nets the
+   * value above the remaining price obligation.
+   */
+  remainingPlanObligationOmr: number;
   netSaleProceedsOmr: number;
 }
 
@@ -228,8 +234,20 @@ export function buildProjection(input: ProjectionInput): ProjectionResult {
   }
   const sellingCostsOmr = roundOMR(d(exitValueOmr).times(sellingCostsPct).dividedBy(100));
   const loanBalanceAtExitOmr = last.balance;
+  // Instalments falling due after the hold are still owed on the price — an
+  // early exit settles them from the sale. Without this, selling before the
+  // plan completes would book the full property value against a part-paid
+  // price: phantom profit.
+  const remainingPlanObligationOmr = roundOMR(
+    scheduledOutflows
+      .filter((o) => o.monthsFromStart > holdYears * 12)
+      .reduce((acc, o) => acc + o.amountOmr, 0),
+  );
   const netSaleProceedsOmr = roundOMR(
-    d(exitValueOmr).minus(sellingCostsOmr).minus(loanBalanceAtExitOmr),
+    d(exitValueOmr)
+      .minus(sellingCostsOmr)
+      .minus(loanBalanceAtExitOmr)
+      .minus(remainingPlanObligationOmr),
   );
   const exit: ExitSummary = {
     exitYear: holdYears,
@@ -237,6 +255,7 @@ export function buildProjection(input: ProjectionInput): ProjectionResult {
     method,
     sellingCostsOmr,
     loanBalanceAtExitOmr,
+    remainingPlanObligationOmr,
     netSaleProceedsOmr,
   };
 
@@ -282,13 +301,17 @@ export function buildProjection(input: ProjectionInput): ProjectionResult {
     }
   } else {
     // Monthly rows: annual figures divided over the year's income-active
-    // months; debt service and instalments land in their true months.
+    // months; debt service and instalments land in their true months. The
+    // divisor counts months on the SAME integer grid as monthActive so the
+    // monthly rows always reconcile with the annual figures, including
+    // fractional handover offsets.
+    const gridStart = Math.floor(incomeStartMonths);
     for (let y = 1; y <= holdYears; y++) {
       const r = years[y - 1];
       for (let m = 1; m <= 12; m++) {
         const monthIndex = (y - 1) * 12 + m;
         const monthActive = monthIndex > incomeStartMonths;
-        const activeMonthsInYear = Math.round(activeFractionOfYear(y, incomeStartMonths) * 12);
+        const activeMonthsInYear = Math.max(0, y * 12 - Math.max((y - 1) * 12, gridStart));
         const per = (annual: number) =>
           monthActive && activeMonthsInYear > 0 ? roundOMR(d(annual).dividedBy(activeMonthsInYear)) : 0;
         const debtService = loan

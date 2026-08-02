@@ -31,6 +31,11 @@ performance, deals, commissions, and **performance-based payouts**.
   DB-or-snapshot data layer (`loadData()`) so every dashboard switches to live data once synced.
   Flip on real per-person **Supabase login** + the database by setting env — full steps in
   [`docs/GO-LIVE.md`](docs/GO-LIVE.md).
+- **Investment Intelligence** (`/war-room` → Invest): deterministic ROI analyzer — daily/
+  monthly/annual rental strategies, financing (mortgage & developer plans), 1–30-year cash-flow
+  projection, objective qualification with an explainable score, a formula-driven offer-price
+  solver, scenarios & sensitivity, comparables import with provenance, and internal vs
+  client-safe AI-narrated reports — see [`docs/investment-intelligence.md`](docs/investment-intelligence.md).
 
 ---
 

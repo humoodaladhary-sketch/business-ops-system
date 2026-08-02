@@ -190,6 +190,47 @@ describe("runInvestmentAnalysis — modes and edge cases", () => {
     expect(r.projection.totalCashInOmr).toBe(145000 + 4850);
   });
 
+  it("lender fees join the cash requirement (never silently dropped)", () => {
+    const withFees = runInvestmentAnalysis({
+      ...FIXTURE,
+      financing: { ...FIXTURE.financing, mortgageFeesOmr: 1000 },
+    });
+    const without = runInvestmentAnalysis(FIXTURE);
+    expect(withFees.acquisition.totalCashRequiredOmr).toBe(without.acquisition.totalCashRequiredOmr + 1000);
+    expect(withFees.acquisition.lines.some((l) => l.key === "lenderFees")).toBe(true);
+    // More cash in → lower cash-on-cash
+    expect(withFees.metrics.cashOnCashPct as number).toBeLessThan(without.metrics.cashOnCashPct as number);
+  });
+
+  it("early exit from a payment plan settles the remaining instalments (no phantom profit)", () => {
+    const r = runInvestmentAnalysis({
+      ...FIXTURE,
+      property: { ...FIXTURE.property, completionStatus: "off_plan", handoverMonths: 36 },
+      strategies: {},
+      activeStrategy: "annual",
+      objectives: undefined,
+      financing: {
+        mode: "payment_plan",
+        plan: { reservationPct: 0.05, downPct: 0.15, years: 5, installmentsPerYear: 4 },
+      },
+      projection: { holdYears: 2, appreciationPct: 0, sellingCostsPct: 0, discountRatePct: 8 },
+    });
+    expect(r.projection.exit.remainingPlanObligationOmr).toBeGreaterThan(0);
+    // No rent, flat price: profit is bounded by the acquisition extras, never a windfall
+    expect(r.projection.totalProfitOmr).toBeLessThanOrEqual(0);
+  });
+
+  it("cash deals pass a max-LTV objective (0% leverage, not unknown)", () => {
+    const r = runInvestmentAnalysis({
+      ...FIXTURE,
+      financing: { mode: "cash" },
+      objectives: { maxLtvPct: 70 },
+    });
+    const ltv = r.qualification.criteria.find((c) => c.key === "ltv")!;
+    expect(ltv.status).toBe("pass");
+    expect(ltv.actual).toBe(0);
+  });
+
   it("no strategy configured: warns and keeps figures at zero (no invention)", () => {
     const r = runInvestmentAnalysis({
       ...FIXTURE,

@@ -125,6 +125,15 @@ describe("paybackYears", () => {
     // −1000, +800, −300 (cum −500), +1000 → crosses in year 3 at 500/1000
     expect(paybackYears([-1000, 800, -300, 1000])).toBe(2.5);
   });
+  it("a non-negative t0 with later outflows still requires real recovery", () => {
+    // cum: 100, −200, −100, +50 → capital goes at risk in year 1, recovered in year 3
+    expect(paybackYears([100, -300, 100, 150])).toBe(2.67);
+    // never recovered → null, not 0
+    expect(paybackYears([0, -500, 100])).toBeNull();
+  });
+  it("flows that never go negative have no capital at risk (payback 0)", () => {
+    expect(paybackYears([100, 50, 25])).toBe(0);
+  });
 });
 
 describe("equityMultiple / cagrPct", () => {

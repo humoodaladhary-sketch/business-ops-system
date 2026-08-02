@@ -134,6 +134,65 @@ describe("buildProjection — off-plan with payment plan", () => {
     expect(p.totalCashInOmr).toBe(125000);
   });
 
+  it("selling before the plan completes settles the remaining instalments from the sale (no phantom profit)", () => {
+    // Zero-economics control: buy at 100000 via a 5-year plan, sell year 3 at
+    // 100000 with no rent and no costs. Before the fix this booked +32000
+    // profit and 24.96% IRR from the unpaid months-39..60 instalments.
+    const outflows = [
+      { monthsFromStart: 0, amountOmr: 20000, label: "Reservation + down" },
+      ...Array.from({ length: 20 }, (_, i) => ({
+        monthsFromStart: (i + 1) * 3,
+        amountOmr: 4000,
+        label: `Instalment ${i + 1}`,
+      })),
+    ];
+    const p = buildProjection({
+      priceOmr: 100000,
+      initialOutflowOmr: 0,
+      scheduledOutflows: outflows,
+      egiOmr: 0,
+      opexOmr: 0,
+      holdYears: 3,
+      appreciationPct: 0,
+      sellingCostsPct: 0,
+    });
+    // 20000 at t0 + 4 instalments/yr × 3 yrs × 4000 = 68000 paid; 32000 still owed
+    expect(p.exit.remainingPlanObligationOmr).toBe(32000);
+    expect(p.exit.netSaleProceedsOmr).toBe(68000); // 100000 − 32000
+    expect(p.totalProfitOmr).toBe(0);
+    expect(p.irrPct).toBe(0);
+    // Selling in year 1 (before handover) is the extreme case: only 36000 paid
+    const early = buildProjection({
+      priceOmr: 100000,
+      initialOutflowOmr: 0,
+      scheduledOutflows: outflows,
+      egiOmr: 0,
+      opexOmr: 0,
+      holdYears: 1,
+      appreciationPct: 0,
+      sellingCostsPct: 0,
+    });
+    expect(early.exit.remainingPlanObligationOmr).toBe(64000);
+    expect(early.totalProfitOmr).toBe(0);
+  });
+
+  it("holding through the whole plan leaves no remaining obligation", () => {
+    const p = buildProjection({
+      priceOmr: 120000,
+      initialOutflowOmr: 5000,
+      scheduledOutflows: [
+        { monthsFromStart: 0, amountOmr: 24000, label: "Down" },
+        { monthsFromStart: 12, amountOmr: 48000, label: "Instalment 1" },
+        { monthsFromStart: 24, amountOmr: 48000, label: "Instalment 2" },
+      ],
+      egiOmr: 9000,
+      opexOmr: 1500,
+      handoverMonths: 24,
+      holdYears: 5,
+    });
+    expect(p.exit.remainingPlanObligationOmr).toBe(0);
+  });
+
   it("partial-year handover prorates the first income year", () => {
     const p = buildProjection({
       priceOmr: 100000,
@@ -203,6 +262,32 @@ describe("buildProjection — monthly granularity", () => {
     // Sale proceeds land in the final month only
     expect(p.periods[22].saleProceedsOmr).toBe(0);
     expect(p.periods[23].saleProceedsOmr).toBe(p.exit.netSaleProceedsOmr);
+  });
+
+  it("fractional handover months reconcile: monthly income sums to the annual figure", () => {
+    const p = buildProjection({
+      priceOmr: 100000,
+      initialOutflowOmr: 100000,
+      egiOmr: 12000,
+      opexOmr: 0,
+      handoverMonths: 6.5, // mid-month handover
+      holdYears: 2,
+      granularity: "monthly",
+    });
+    const annual = buildProjection({
+      priceOmr: 100000,
+      initialOutflowOmr: 100000,
+      egiOmr: 12000,
+      opexOmr: 0,
+      handoverMonths: 6.5,
+      holdYears: 2,
+      granularity: "annual",
+    });
+    const y1Monthly = p.periods.filter((x) => x.year === 1).reduce((a, x) => a + x.rentalIncomeOmr, 0);
+    // Each monthly row rounds to baisa, so allow the accumulated 3-dp drift.
+    expect(Math.abs(y1Monthly - annual.periods[0].rentalIncomeOmr)).toBeLessThan(0.01);
+    // Active months on the integer grid: months 7..12 = 6 rows with income
+    expect(p.periods.filter((x) => x.year === 1 && x.rentalIncomeOmr > 0)).toHaveLength(6);
   });
 
   it("clamps the hold to 1–30 years", () => {

@@ -104,10 +104,11 @@ export function equityMultiple(totalDistributionsOmr: number, totalInvestedOmr: 
 
 /**
  * Net present value of periodic cash flows at a periodic discount rate (whole
- * percent). cashflows[0] is at t=0 (undiscounted). Returns OMR (3 dp).
+ * percent). cashflows[0] is at t=0 (undiscounted). Returns OMR (3 dp). Rates
+ * at or below −100% are clamped to −99.99% (a −100% rate has no defined NPV).
  */
 export function npvOmr(discountRatePct: number, cashflowsOmr: number[]): number {
-  const rate = d(discountRatePct).dividedBy(100);
+  const rate = d(Math.max(discountRatePct, -99.99)).dividedBy(100);
   let acc = d(0);
   for (let t = 0; t < cashflowsOmr.length; t++) {
     acc = acc.plus(d(cashflowsOmr[t]).dividedBy(rate.plus(1).pow(t)));
@@ -189,22 +190,24 @@ export function mirrPct(
 }
 
 /**
- * Payback period in years: when cumulative cash flow (flows[0] at t=0 is the
- * investment, negative) first reaches 0, with linear interpolation inside the
- * crossing year. Null when it never pays back within the given flows.
+ * Payback period in years: when the cumulative cash flow first recovers to 0
+ * AFTER having been negative, with linear interpolation inside the crossing
+ * year. Flows that never go negative have no capital at risk → 0. Null when
+ * invested capital is never recovered within the given flows.
  */
 export function paybackYears(cashflowsOmr: number[]): number | null {
   let cumulative = 0;
+  let wasNegative = false;
   for (let t = 0; t < cashflowsOmr.length; t++) {
     const prev = cumulative;
     cumulative += cashflowsOmr[t];
-    if (cumulative >= 0 && t > 0) {
+    if (wasNegative && cumulative >= 0) {
       const within = cashflowsOmr[t] !== 0 ? -prev / cashflowsOmr[t] : 0;
       return Math.round((t - 1 + within) * 100) / 100;
     }
-    if (cumulative >= 0 && t === 0) return 0;
+    if (cumulative < 0) wasNegative = true;
   }
-  return null;
+  return wasNegative ? null : 0;
 }
 
 /** Compound annual growth rate from start to end value over years, whole percent. Null when inputs are non-positive. */

@@ -368,6 +368,9 @@ export function ReportSheet({
               <td className={cn(TD, "font-semibold")}>Exit (yr {view.projection.exit.exitYear})</td>
               <td className={cn(TD, "text-right text-zinc-500")} colSpan={3}>
                 {view.projection.exit.method === "exit_cap" ? "Exit-cap valuation" : "Appreciated value"} − selling costs − loan balance
+                {view.projection.exit.remainingPlanObligationOmr > 0
+                  ? ` − ${formatOMR(view.projection.exit.remainingPlanObligationOmr, true)} remaining plan instalments`
+                  : ""}
               </td>
               <td className={cn(TD, "text-right font-semibold tabular-nums")} colSpan={3}>
                 Net proceeds {formatOMR(view.projection.exit.netSaleProceedsOmr)}

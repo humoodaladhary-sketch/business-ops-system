@@ -53,6 +53,13 @@ export interface LoanSchedule {
   /** Balance after the grace period capitalization (== principal when no grace). */
   capitalizedPrincipalOmr: number;
   totalPaidOmr: number;
+  /**
+   * Interest PAID across the schedule. Interest capitalized during a grace
+   * period is not paid — it becomes principal (capitalizedPrincipal − original
+   * principal) and is repaid, with interest on it, through the payments. The
+   * borrower's full financing cost vs the original principal is
+   * totalPaidOmr − principalOmr.
+   */
   totalInterestOmr: number;
   feesOmr: number;
   periods: LoanPeriod[];
@@ -136,6 +143,10 @@ export function buildLoanSchedule(input: LoanInput): LoanSchedule {
   const ioPeriods = Math.min(totalPeriods, Math.floor(interestOnlyMonths / monthsPerPeriod));
   const amortPeriods = totalPeriods - ioPeriods;
 
+  // A balloon cannot exceed what is owed — clamp so an oversized balloon
+  // degrades to interest-only-until-maturity instead of negative payments.
+  const balloonClampedOmr = Math.min(Math.max(0, balloonOmr), roundOMR(balance));
+
   const ioPayment = balance.times(periodicRate);
   const interestOnlyPaymentOmr = ioPeriods > 0 ? roundOMR(ioPayment) : 0;
 
@@ -144,11 +155,11 @@ export function buildLoanSchedule(input: LoanInput): LoanSchedule {
   if (amortPeriods <= 0) {
     payment = d(0);
   } else if (periodicRate.isZero()) {
-    payment = balance.minus(balloonOmr).dividedBy(amortPeriods);
+    payment = balance.minus(balloonClampedOmr).dividedBy(amortPeriods);
   } else {
     const discount = periodicRate.plus(1).pow(-amortPeriods);
     payment = balance
-      .minus(d(balloonOmr).times(discount))
+      .minus(d(balloonClampedOmr).times(discount))
       .times(periodicRate)
       .dividedBy(d(1).minus(discount));
   }

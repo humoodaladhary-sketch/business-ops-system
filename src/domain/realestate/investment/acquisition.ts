@@ -48,9 +48,10 @@ export interface AcquisitionResult {
   lines: CostLine[];
 }
 
-/** Round a percentage value to 2 dp, half-up. */
+/** Round a percentage value to 2 dp, half-up (−0 normalized to 0). */
 export function roundPct(value: number): number {
-  return d(value).toDecimalPlaces(2).toNumber();
+  const n = d(value).toDecimalPlaces(2).toNumber();
+  return n === 0 ? 0 : n;
 }
 
 /**

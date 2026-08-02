@@ -16,6 +16,7 @@ import { buildLoanSchedule, loanToValuePct, type LoanInput, type LoanSchedule } 
 import {
   annualStrategy,
   blendStrategies,
+  breakEvenOccupancyOfResult,
   dailyStrategy,
   monthlyStrategy,
   type AnnualStrategyInput,
@@ -25,7 +26,6 @@ import {
   type StrategyType,
 } from "./rental";
 import {
-  breakEvenOccupancyPct,
   capRatePct,
   cashOnCashPct,
   debtYieldPct,
@@ -103,7 +103,11 @@ export interface AnalysisFinancingInput {
   interestOnlyMonths?: number;
   balloonOmr?: number;
   mortgageFeesOmr?: number;
-  /** Developer plan (percent-driven, scales with price). */
+  /**
+   * Developer plan (scales with price). NOTE: reservationPct/downPct are
+   * FRACTIONS (0.15 = 15%) — the `paymentPlan` calculators contract — unlike
+   * the whole-percent convention everywhere else in this module.
+   */
   plan?: {
     reservationPct?: number;
     reservationOmr?: number;
@@ -225,6 +229,8 @@ interface CoreResult {
   schedule: LoanSchedule | null;
   scheduledOutflows: ScheduledOutflow[];
   annualDebtServiceOmr: number;
+  /** Cash basis used for CoC: total cash in for payment plans, else cash at close. */
+  totalCashInvestedOmr: number;
   projection: ProjectionResult;
   metrics: HeadlineMetrics;
   warnings: string[];
@@ -326,9 +332,22 @@ function computeCore(input: InvestmentAnalysisInput): CoreResult {
 
   // --- Acquisition. For a payment plan the price is paid via the schedule, so
   // the financed amount is 0 and the projection carries the instalments.
+  // Lender fees quoted in the financing step are real cash at close — they
+  // join the cost lines here so cash-required and return figures carry them.
+  const costLines =
+    fin.mode === "mortgage" && (fin.mortgageFeesOmr ?? 0) > 0
+      ? [
+          ...input.acquisition.costLines,
+          {
+            key: "lenderFees",
+            label: "Mortgage arrangement / lender fees",
+            amountOmr: fin.mortgageFeesOmr as number,
+          },
+        ]
+      : input.acquisition.costLines;
   const acquisition = acquisitionCosts({
     priceOmr: price,
-    costLines: input.acquisition.costLines,
+    costLines,
     contingencyPct: input.acquisition.contingencyPct,
     financedOmr: fin.mode === "mortgage" ? loanOmr : 0,
     areaSqm: input.property.areaSqm,
@@ -398,12 +417,9 @@ function computeCore(input: InvestmentAnalysisInput): CoreResult {
     dscr: dscr(active.noiOmr, annualDebtServiceOmr),
     debtYieldPct: schedule ? debtYieldPct(active.noiOmr, schedule.capitalizedPrincipalOmr) : null,
     ltvPct: loanOmr > 0 ? loanToValuePct(loanOmr, valueBasis) : null,
-    breakEvenOccupancyPct: breakEvenOccupancyPct(
-      active.operatingExpensesOmr,
-      annualDebtServiceOmr,
-      active.otherIncomeOmr,
-      active.grossPotentialIncomeOmr,
-    ),
+    // Strategy-aware: fee-net EGI and occupancy-variable expenses, so
+    // revenue-share fees (platform/tourism) stay inside the equation.
+    breakEvenOccupancyPct: breakEvenOccupancyOfResult(active, annualDebtServiceOmr),
     operatingExpenseRatioPct: active.operatingExpenseRatioPct,
     profitPerSqmOmr: profitPerSqm,
     returnPerSqmOmr:
@@ -419,6 +435,7 @@ function computeCore(input: InvestmentAnalysisInput): CoreResult {
     schedule,
     scheduledOutflows,
     annualDebtServiceOmr,
+    totalCashInvestedOmr: totalCash,
     projection,
     metrics,
     warnings,
@@ -540,17 +557,29 @@ function outcomeOf(core: CoreResult): ScenarioOutcome {
 function buildExplains(core: CoreResult): ExplainEntry[] {
   const m = core.metrics;
   const s = core.active;
+  // Revenue-based fees (platform/payment/tourism) are deducted before EGI on
+  // short-let strategies — the printed arithmetic must include them.
+  const revenueFeesOmr =
+    Math.round(
+      (s.grossPotentialIncomeOmr - s.vacancyLossOmr + s.otherIncomeOmr - s.effectiveGrossIncomeOmr) * 1000,
+    ) / 1000;
   const entries: ExplainEntry[] = [
     {
       metric: "Effective gross income",
-      formula: "gross potential income − vacancy loss + other operating income",
+      formula:
+        revenueFeesOmr !== 0
+          ? "gross potential income − vacancy loss + other operating income − revenue-based fees"
+          : "gross potential income − vacancy loss + other operating income",
       inputs: {
         grossPotentialIncomeOmr: s.grossPotentialIncomeOmr,
         vacancyLossOmr: s.vacancyLossOmr,
         otherIncomeOmr: s.otherIncomeOmr,
+        ...(revenueFeesOmr !== 0 ? { revenueFeesOmr } : {}),
       },
       steps: [
-        `${s.grossPotentialIncomeOmr} − ${s.vacancyLossOmr} + ${s.otherIncomeOmr} = ${s.effectiveGrossIncomeOmr} OMR`,
+        revenueFeesOmr !== 0
+          ? `${s.grossPotentialIncomeOmr} − ${s.vacancyLossOmr} + ${s.otherIncomeOmr} − ${revenueFeesOmr} (platform/payment/tourism fees) = ${s.effectiveGrossIncomeOmr} OMR`
+          : `${s.grossPotentialIncomeOmr} − ${s.vacancyLossOmr} + ${s.otherIncomeOmr} = ${s.effectiveGrossIncomeOmr} OMR`,
       ],
       result: s.effectiveGrossIncomeOmr,
     },
@@ -591,11 +620,11 @@ function buildExplains(core: CoreResult): ExplainEntry[] {
       formula: "annual pre-tax cash flow ÷ total cash invested × 100",
       inputs: {
         annualCashFlowOmr: m.annualCashFlowOmr,
-        totalCashInvestedOmr: core.acquisition.totalCashRequiredOmr,
+        totalCashInvestedOmr: core.totalCashInvestedOmr,
       },
       steps: [
         m.cashOnCashPct != null
-          ? `(${m.noiOmr} NOI − ${m.annualDebtServiceOmr} debt service) ÷ ${core.acquisition.totalCashRequiredOmr} × 100 = ${m.cashOnCashPct}%`
+          ? `(${m.noiOmr} NOI − ${m.annualDebtServiceOmr} debt service) ÷ ${core.totalCashInvestedOmr} × 100 = ${m.cashOnCashPct}%`
           : "Total cash invested is 0 — return undefined.",
       ],
       result: m.cashOnCashPct,
@@ -613,17 +642,18 @@ function buildExplains(core: CoreResult): ExplainEntry[] {
     },
     {
       metric: "Break-even occupancy",
-      formula: "(operating expenses + debt service − other income) ÷ gross potential income × 100",
+      formula:
+        "(fixed operating expenses + debt service) ÷ (fee-net EGI − occupancy-variable expenses) × assumed occupancy",
       inputs: {
         operatingExpensesOmr: s.operatingExpensesOmr,
         annualDebtServiceOmr: m.annualDebtServiceOmr,
-        otherIncomeOmr: s.otherIncomeOmr,
-        grossPotentialIncomeOmr: s.grossPotentialIncomeOmr,
+        effectiveGrossIncomeOmr: s.effectiveGrossIncomeOmr,
+        assumedOccupancyPct: s.assumedOccupancyPct,
       },
       steps: [
         m.breakEvenOccupancyPct != null
-          ? `(${s.operatingExpensesOmr} + ${m.annualDebtServiceOmr} − ${s.otherIncomeOmr}) ÷ ${s.grossPotentialIncomeOmr} × 100 = ${m.breakEvenOccupancyPct}%`
-          : "No gross potential income — break-even occupancy undefined.",
+          ? `Occupancy at which cash flow crosses 0 under the linear occupancy model: ${m.breakEvenOccupancyPct}% (above 100% = the deal cannot break even).`
+          : "No income margin at any occupancy — break-even occupancy undefined.",
       ],
       result: m.breakEvenOccupancyPct,
     },
@@ -642,15 +672,16 @@ function buildExplains(core: CoreResult): ExplainEntry[] {
       metric: "Exit / net sale proceeds",
       formula:
         core.projection.exit.method === "exit_cap"
-          ? "forward NOI ÷ exit cap − selling costs − loan balance"
-          : "price × (1+appreciation)^hold − selling costs − loan balance",
+          ? "forward NOI ÷ exit cap − selling costs − loan balance − remaining plan instalments"
+          : "price × (1+appreciation)^hold − selling costs − loan balance − remaining plan instalments",
       inputs: {
         exitValueOmr: core.projection.exit.exitValueOmr,
         sellingCostsOmr: core.projection.exit.sellingCostsOmr,
         loanBalanceAtExitOmr: core.projection.exit.loanBalanceAtExitOmr,
+        remainingPlanObligationOmr: core.projection.exit.remainingPlanObligationOmr,
       },
       steps: [
-        `${core.projection.exit.exitValueOmr} − ${core.projection.exit.sellingCostsOmr} − ${core.projection.exit.loanBalanceAtExitOmr} = ${core.projection.exit.netSaleProceedsOmr} OMR`,
+        `${core.projection.exit.exitValueOmr} − ${core.projection.exit.sellingCostsOmr} − ${core.projection.exit.loanBalanceAtExitOmr} − ${core.projection.exit.remainingPlanObligationOmr} = ${core.projection.exit.netSaleProceedsOmr} OMR`,
       ],
       result: core.projection.exit.netSaleProceedsOmr,
     },
@@ -854,7 +885,9 @@ function qualificationInputs(
     cashOnCashPct: core.metrics.cashOnCashPct,
     irrPct: core.projection.irrPct,
     dscr: core.metrics.dscr,
-    ltvPct: core.metrics.ltvPct,
+    // No loan means 0% leverage — a max-LTV objective passes trivially rather
+    // than sitting unknown forever on cash deals.
+    ltvPct: core.loanOmr > 0 ? core.metrics.ltvPct : 0,
     paybackYears: core.projection.paybackYears,
     monthlyCashFlowOmr: core.metrics.monthlyCashFlowOmr,
     annualIncomeOmr: core.active.effectiveGrossIncomeOmr,

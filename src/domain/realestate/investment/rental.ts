@@ -214,7 +214,12 @@ export interface MonthlyStrategyInput {
   monthlyRentOmr: number;
   /** Vacancy as a whole percent of the year. Default 0. */
   vacancyPct?: number;
-  /** Months to first tenant in year 1 (lease-up), on top of vacancy. Default 0. */
+  /**
+   * Months to first tenant (lease-up), on top of vacancy. Default 0.
+   * NOTE: applied to the strategy's stabilized ANNUAL figure, so in a
+   * multi-year projection it recurs every year — model a one-off year-1
+   * lease-up via the projection's extraVacancyPctByYear instead.
+   */
   leaseUpMonths?: number;
   /** Rent-free months granted per year. Default 0. */
   rentFreeMonths?: number;
@@ -368,6 +373,51 @@ export function annualStrategy(input: AnnualStrategyInput): StrategyResult {
       annualRentOmr: roundOMR(annualRentOmr),
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Break-even occupancy (strategy-aware)
+// ---------------------------------------------------------------------------
+
+/** Expense-line keys that scale with occupancy (blended lines carry a "strategy:" prefix). */
+const OCCUPANCY_VARIABLE_KEYS = new Set(["management", "cleaningCosts"]);
+
+function isVariableLine(key: string): boolean {
+  const bare = key.includes(":") ? key.split(":")[1] : key;
+  return OCCUPANCY_VARIABLE_KEYS.has(bare);
+}
+
+/**
+ * Break-even occupancy for a computed strategy result, whole percent.
+ *
+ * Linear occupancy model: effective gross income (already NET of the
+ * revenue-proportional platform/payment/tourism fees) and the
+ * occupancy-variable expense lines (management, cleaning costs) scale with
+ * occupancy; the remaining expense lines are fixed. Solving cash flow = 0:
+ *
+ *   scale* = (fixed expenses + debt service) / (EGI − variable expenses)
+ *   break-even occupancy = scale* × assumed occupancy
+ *
+ * Using fee-net EGI keeps revenue-share fees in the equation — the naive
+ * (opex + debt) / gross-potential formula silently drops them for short-let
+ * deals and understates the break-even point. Values above 100% are real
+ * findings (the deal cannot break even). Null when the assumed occupancy is 0
+ * or the occupancy-variable margin is non-positive (no occupancy can cover
+ * the fixed outgoings).
+ */
+export function breakEvenOccupancyOfResult(
+  result: StrategyResult,
+  annualDebtServiceOmr: number,
+): number | null {
+  if (result.assumedOccupancyPct <= 0) return null;
+  const variableOpex = result.expenseLines
+    .filter((l) => isVariableLine(l.key))
+    .reduce((acc, l) => acc + l.amountOmr, 0);
+  const fixedOpex = d(result.operatingExpensesOmr).minus(variableOpex);
+  const margin = d(result.effectiveGrossIncomeOmr).minus(variableOpex);
+  if (margin.lessThanOrEqualTo(0)) return null;
+  const scale = fixedOpex.plus(annualDebtServiceOmr).dividedBy(margin);
+  return roundPct(scale.times(result.assumedOccupancyPct).toNumber());
 }
 
 // ---------------------------------------------------------------------------

@@ -80,16 +80,17 @@ Formulas are documented as JSDoc on each function (the code is the canonical
 spec) and every result carries explain steps. Summary:
 
 - Gross yield = annual gross rental income / price
-- EGI = gross scheduled income − vacancy loss + other operating income
+- EGI = gross scheduled income − vacancy loss + other operating income − revenue-based fees (short-let)
 - NOI = EGI − operating expenses
 - Cap rate = NOI / value · Cash-on-cash = annual pre-tax cash flow / total cash invested
 - DSCR = NOI / annual debt service · Debt yield = NOI / outstanding loan
-- Break-even occupancy = (opex + debt service − other income) / gross potential income
+- Break-even occupancy (strategy-aware linear model) = (fixed opex + debt service) / (fee-net EGI − occupancy-variable opex) × assumed occupancy — keeps platform/tourism revenue shares in the equation; values > 100% mean the deal cannot break even
 - Equity multiple = total cash distributions / total equity invested
 - IRR: bisection on NPV sign change over [−99.9%, 1000%], null when no sign change
 - MIRR = (FV(positives @ reinvest) / −PV(negatives @ finance))^(1/n) − 1
-- Amortizing payment (balloon-aware): (P − B·(1+i)⁻ⁿ)·i / (1 − (1+i)⁻ⁿ)
-- Exit (cap method) = forward NOI / exit cap; net proceeds = exit value − selling costs − loan balance
+- Payback: first cumulative recovery to ≥ 0 after capital was at risk; never-negative flows → 0; never recovered → null (a set max-payback objective treats null as FAIL, not missing data)
+- Amortizing payment (balloon-aware, balloon clamped to the outstanding balance): (P − B·(1+i)⁻ⁿ)·i / (1 − (1+i)⁻ⁿ)
+- Exit (cap method) = forward NOI / exit cap; net proceeds = exit value − selling costs − loan balance − remaining developer-plan instalments (an early exit settles the unpaid price from the sale — no phantom profit on off-plan flips)
 
 ## 5. Environment variables
 
@@ -99,12 +100,51 @@ No new variables. The AI report reuses the copilot credential ladder
 a database key the Invest tab still works fully in-session (manual entry, no
 save); without an Anthropic key the report shows the standard setup notice.
 
-## 6. Phase log
+## 6. Using the Invest tab (user guide)
+
+1. **Property** — pick a unit from live inventory (facts marked VERIFIED) or
+   enter one manually (marked ASSUMED). Latitude/longitude unlock landmark
+   distances.
+2. **Purchase & costs** — asking/negotiated price plus itemized one-off costs;
+   "Apply standard Oman assumptions" fills sourced defaults you then confirm.
+3. **Rental strategies** — enable daily, monthly and/or annual, enter income
+   and operating costs, choose which strategy (or a blend) drives the numbers.
+4. **Financing** — cash, mortgage (LTV, rate, term, grace, interest-only,
+   balloon, quarterly) or the developer plan for off-plan units.
+5. **Hold, exit & objectives** — hold period, growth assumptions, exit method,
+   and the measurable targets that define "a good deal" for this investor.
+6. **Comparables & location** — paste CSV/JSON comps or add them manually,
+   with source + provenance on every row.
+7. **Results** — verdict badge + explainable score, KPI grid, offer-price
+   table ("To Offer" hands the chosen price to the Offer builder), scenarios,
+   sensitivity, criteria pass/fail, "Explain the calculations".
+8. **Report** — internal or client-safe sheet, optional AI narrative
+   (EN/AR, needs a saved analysis), Print/PDF. Save/duplicate/history in the
+   toolbar; each save is recomputed and versioned server-side.
+
+Migration to apply once in the Supabase SQL editor:
+`supabase/migrations/0010_investment_analysis.up.sql` (reverse:
+`0010_investment_analysis.down.sql`).
+
+## 7. Phase log
 
 - **Phase 1** — this document.
-- **Phase 2** — engine modules + unit tests (see `src/domain/realestate/investment/`).
+- **Phase 2** — engine modules + 105 unit tests (`src/domain/realestate/investment/`).
 - **Phase 3** — migration 0010, `/api/invest/*` routes, audit logging.
 - **Phase 4–5** — Invest tab UI, prefill, objectives, solver, scenarios, sensitivity.
 - **Phase 6** — location signals + comparables import with provenance.
 - **Phase 7** — AI narrative + internal/client-safe report + print export + history.
-- **Phase 8** — gate green, regression check on Offer/Compare/Calculators/ITC Map.
+- **Phase 8** — adversarial engine review (11-agent workflow): 2 critical + 5
+  major findings confirmed by execution and fixed with regression tests —
+  early-exit plan obligations, short-let break-even fees, lender fees in cash,
+  payback semantics, monthly-row reconciliation, explain-equation accuracy.
+  Gate green (typecheck + 317 vitest + build); no regression in Offer /
+  Compare / Calculators / ITC Map (untouched code paths + full suite).
+
+## 8. Changelog
+
+- **2026-08-02** — Investment Intelligence & ROI Analyzer shipped: Invest tab
+  in Pro Mode, deterministic engine (formula v1.0.0), objective
+  qualification, offer-price solver, scenarios & sensitivity, comparables
+  import, location signals, internal/client-safe reports with AI narrative,
+  migration 0010.

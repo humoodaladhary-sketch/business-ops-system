@@ -174,8 +174,26 @@ export function qualify(
   if (p.minIrrPct != null) criteria.push(criterion("irr", "IRR", "min", p.minIrrPct, inputs.irrPct));
   if (p.minDscr != null) criteria.push(criterion("dscr", "DSCR", "min", p.minDscr, inputs.dscr));
   if (p.maxLtvPct != null) criteria.push(criterion("ltv", "Loan-to-value", "max", p.maxLtvPct, inputs.ltvPct));
-  if (p.maxPaybackYears != null)
-    criteria.push(criterion("payback", "Payback period (years)", "max", p.maxPaybackYears, inputs.paybackYears));
+  if (p.maxPaybackYears != null) {
+    // A null payback after a real projection means the capital is NEVER
+    // recovered within the hold — that is a hard fail, not missing data.
+    if (inputs.paybackYears == null) {
+      criteria.push({
+        key: "payback",
+        label: "Payback period (years)",
+        direction: "max",
+        target: p.maxPaybackYears,
+        actual: "never (within hold)",
+        status: "fail",
+        distance: null,
+        distancePct: null,
+      });
+    } else {
+      criteria.push(
+        criterion("payback", "Payback period (years)", "max", p.maxPaybackYears, inputs.paybackYears),
+      );
+    }
+  }
   if (p.minMonthlyCashFlowOmr != null)
     criteria.push(
       criterion("monthlyCashFlow", "Monthly cash flow (OMR)", "min", p.minMonthlyCashFlowOmr, inputs.monthlyCashFlowOmr),

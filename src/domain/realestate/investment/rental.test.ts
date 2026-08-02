@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { annualStrategy, blendStrategies, dailyStrategy, monthlyStrategy } from "./rental";
+import {
+  annualStrategy,
+  blendStrategies,
+  breakEvenOccupancyOfResult,
+  dailyStrategy,
+  monthlyStrategy,
+} from "./rental";
 
 describe("dailyStrategy", () => {
   it("computes nights, booking revenue, fees, EGI and NOI (flat occupancy)", () => {
@@ -117,6 +123,35 @@ describe("annualStrategy", () => {
     const r = annualStrategy({ annualRentOmr: 0, serviceChargeOmr: 900 });
     expect(r.noiOmr).toBe(-900);
     expect(r.operatingExpenseRatioPct).toBeNull();
+  });
+});
+
+describe("breakEvenOccupancyOfResult", () => {
+  it("keeps revenue-share fees in the break-even equation (short-let)", () => {
+    // ADR 100 × 365 nights, platform 20%, fixed opex 10000, debt 20000.
+    // Fee-net income at 100% = 29200; true break-even = 30000/29200 = 102.74%
+    // (the naive gross-potential formula reported a false 82.19%).
+    const r = dailyStrategy({ adrOmr: 100, occupancyPct: 100, platformFeePct: 20, utilitiesOmr: 10000 });
+    expect(breakEvenOccupancyOfResult(r, 20000)).toBe(102.74);
+  });
+
+  it("occupancy-variable costs (management, cleaning) scale in the model", () => {
+    // Annual: EGI 6720 at 96% occupancy, mgmt 5% (=336, variable), service 800 (fixed).
+    // scale* = 800 / (6720 − 336) = 0.12531; × 96 = 12.03%
+    const r = annualStrategy({ annualRentOmr: 7000, vacancyAllowancePct: 4, managementFeePct: 5, serviceChargeOmr: 800 });
+    expect(breakEvenOccupancyOfResult(r, 0)).toBe(12.03);
+  });
+
+  it("matches the classic formula when nothing is occupancy-variable", () => {
+    // Annual, no fees/mgmt: BE = (opex + DS) / contract rent
+    const r = annualStrategy({ annualRentOmr: 12000, serviceChargeOmr: 1500 });
+    // (1500 + 6000) / 12000 = 62.5%
+    expect(breakEvenOccupancyOfResult(r, 6000)).toBe(62.5);
+  });
+
+  it("null when no occupancy can cover the outgoings (no income margin)", () => {
+    const r = annualStrategy({ annualRentOmr: 0, serviceChargeOmr: 900 });
+    expect(breakEvenOccupancyOfResult(r, 5000)).toBeNull();
   });
 });
 

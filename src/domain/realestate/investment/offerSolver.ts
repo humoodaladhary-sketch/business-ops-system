@@ -39,9 +39,11 @@ export interface OfferSolverInput {
   negotiatedPriceOmr?: number | null;
   targets: OfferTarget[];
   /**
-   * Deterministic re-evaluation of the deal at a candidate price. Must apply
-   * price-dependent fees/financing consistently (the orchestrator provides
-   * this closure over the full analysis pipeline).
+   * Deterministic re-evaluation of the deal at a candidate price. The
+   * orchestrator's closure scales percent-driven financing (LTV loans,
+   * payment plans) with the candidate price while holding itemized OMR cost
+   * lines constant — conservative at lower prices, where real percentage
+   * fees would fall too.
    */
   evaluate: (priceOmr: number) => PricePointMetrics;
   /** Opening offer sits this far below the justified price, whole percent. Default 5. */

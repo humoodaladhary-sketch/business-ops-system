@@ -83,6 +83,18 @@ describe("buildLoanSchedule", () => {
     expect(Math.abs(penultimate.balanceOmr - 40000)).toBeLessThan(balloon.paymentOmr + 1);
   });
 
+  it("clamps an oversized balloon to the outstanding balance (no negative payments)", () => {
+    const s = buildLoanSchedule({
+      principalOmr: 50000,
+      annualRatePct: 5,
+      termYears: 5,
+      balloonOmr: 200000, // absurd input — degrade to interest-only-to-maturity
+    });
+    expect(s.paymentOmr).toBeGreaterThanOrEqual(0);
+    expect(s.stabilizedAnnualDebtServiceOmr).toBeGreaterThanOrEqual(0);
+    expect(s.periods[s.periods.length - 1].balanceOmr).toBe(0);
+  });
+
   it("quarterly frequency produces 4 payments/year with matching aggregates", () => {
     const s = buildLoanSchedule({
       principalOmr: 60000,
