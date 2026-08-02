@@ -81,22 +81,34 @@ const TD = "border-b border-zinc-200 px-3 py-2 text-sm text-zinc-800";
 // Component
 // ---------------------------------------------------------------------------
 
-export function OfferBuilder({ liveUnits, catalog }: { liveUnits: LiveOfferUnit[]; catalog: OfferUnit[] }) {
+export function OfferBuilder({
+  liveUnits,
+  catalog,
+  prefill = null,
+}: {
+  liveUnits: LiveOfferUnit[];
+  catalog: OfferUnit[];
+  /** Seed unit (e.g. handed over from the Invest tab with its analysed price). */
+  prefill?: OfferUnit | null;
+}) {
   // Client
   const [clientName, setClientName] = useState("");
   const [nationality, setNationality] = useState("");
   const [goal, setGoal] = useState<string>(GOALS[0]);
   const [budgetOmr, setBudgetOmr] = useState("");
 
-  // Unit
-  const [reference, setReference] = useState("");
-  const [project, setProject] = useState("");
-  const [developer, setDeveloper] = useState("");
-  const [unitType, setUnitType] = useState("");
-  const [areaSqm, setAreaSqm] = useState("");
-  const [priceOmr, setPriceOmr] = useState("");
-  const [category, setCategory] = useState<UnitCategory>("ITC");
-  const [ownershipEligibility, setOwnershipEligibility] = useState<OwnershipEligibility>("all_nationalities");
+  // Unit (initialised from the prefill when handed over; the parent remounts
+  // this component with a fresh key whenever the prefill changes)
+  const [reference, setReference] = useState(prefill?.reference ?? "");
+  const [project, setProject] = useState(prefill?.project ?? "");
+  const [developer, setDeveloper] = useState(prefill?.developer ?? "");
+  const [unitType, setUnitType] = useState(prefill?.unitType ?? "");
+  const [areaSqm, setAreaSqm] = useState(prefill && prefill.areaSqm > 0 ? String(prefill.areaSqm) : "");
+  const [priceOmr, setPriceOmr] = useState(prefill && prefill.priceOmr > 0 ? String(prefill.priceOmr) : "");
+  const [category, setCategory] = useState<UnitCategory>(prefill?.category ?? "ITC");
+  const [ownershipEligibility, setOwnershipEligibility] = useState<OwnershipEligibility>(
+    prefill?.ownershipEligibility ?? "all_nationalities",
+  );
 
   // Options
   const [closingToday, setClosingToday] = useState(false);
