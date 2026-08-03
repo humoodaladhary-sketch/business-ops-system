@@ -150,10 +150,14 @@ export function PortalHero({ slides }: { slides: VisualHeroSlide[] }) {
                 blurDataURL={s.image.blurDataUrl ?? undefined}
                 style={{
                   objectFit: "cover",
-                  objectPosition: s.image.objectPosition,
+                  // Dedicated mobile crop: the mobile focal point applies below
+                  // sm, the desktop one above (CSS vars + responsive classes).
+                  ["--hero-fp" as never]: s.image.objectPosition,
+                  ["--hero-fp-m" as never]: s.image.objectPositionMobile ?? s.image.objectPosition,
                   backgroundColor: s.image.dominantColor ?? "#151311",
                 }}
                 className={cn(
+                  "[object-position:var(--hero-fp-m)] sm:[object-position:var(--hero-fp)]",
                   "motion-safe:transition-transform motion-safe:duration-[7000ms] motion-safe:ease-linear",
                   i === index && !reducedMotion ? "motion-safe:scale-105" : "scale-100",
                 )}
