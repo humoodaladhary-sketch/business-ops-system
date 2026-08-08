@@ -15,6 +15,8 @@ import { loadFinanceSummary } from "./_data/live";
 import { loadInboxTasks, loadUnitCounts } from "./_data/portal";
 import { loadNews } from "./_data/news";
 import { loadPortalVisuals } from "./_data/portalVisuals";
+import { loadSocialPulse } from "./_data/socialPulse";
+import { SocialPulseCard } from "./components/portal/SocialPulseCard";
 import { PortalHero, type VisualHeroSlide } from "./components/PortalHero";
 import { Sparkline } from "./components/portal/Sparkline";
 import { OmanMiniMap } from "./components/portal/OmanMiniMap";
@@ -65,13 +67,14 @@ const SYSTEM_TILES: Tile[] = [
 ];
 
 export default async function PortalHome() {
-  const [data, finance, inbox, unitCounts, news, session] = await Promise.all([
+  const [data, finance, inbox, unitCounts, news, session, socialPulse] = await Promise.all([
     loadData(),
     loadFinanceSummary(),
     loadInboxTasks(),
     loadUnitCounts(),
     loadNews(6),
     getSession(),
+    loadSocialPulse(),
   ]);
   const visuals = await loadPortalVisuals(news, session?.role ?? "ADMIN");
   const period = dashboardPeriod(data);
@@ -563,6 +566,9 @@ export default async function PortalHome() {
               </div>
             )}
           </div>
+
+          {/* Social pulse — direct numbers from connected platforms */}
+          {socialPulse && <SocialPulseCard pulse={socialPulse} />}
 
           {/* Oman opportunity map */}
           <OmanMiniMap />

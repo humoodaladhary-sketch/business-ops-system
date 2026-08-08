@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Send,
   ShieldCheck,
+  Sparkles,
   XCircle,
 } from "lucide-react";
 import { Card } from "../../components/ui";
@@ -71,6 +72,21 @@ interface MediaRow {
   alt_text: string | null;
 }
 
+interface MetricRow {
+  account_id: string;
+  captured_at: string;
+  followers: number | null;
+  posts_count: number | null;
+  source: string;
+}
+
+interface GeneratedDraft {
+  platform: string;
+  caption: string;
+  hashtags?: string[];
+  notes?: string;
+}
+
 export function SocialStudio() {
   const [platforms, setPlatforms] = useState<PlatformSpec[]>([]);
   const [accounts, setAccounts] = useState<AccountRow[] | null>(null);
@@ -90,6 +106,14 @@ export function SocialStudio() {
   const [pMedia, setPMedia] = useState<string[]>([]);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [dryRunInfo, setDryRunInfo] = useState<string | null>(null);
+  // Metrics
+  const [metrics, setMetrics] = useState<MetricRow[]>([]);
+  // Generator
+  const [gBrief, setGBrief] = useState("");
+  const [gLang, setGLang] = useState<"en" | "ar" | "both">("en");
+  const [gPlatforms, setGPlatforms] = useState<string[]>([]);
+  const [gDrafts, setGDrafts] = useState<GeneratedDraft[]>([]);
+  const [gBusy, setGBusy] = useState(false);
 
   const say = (kind: "ok" | "err", text: string) => {
     setNotice({ kind, text });
@@ -97,14 +121,16 @@ export function SocialStudio() {
   };
 
   const refresh = useCallback(async () => {
-    const [a, p, m] = await Promise.all([
+    const [a, p, m, met] = await Promise.all([
       fetch("/api/social/accounts").then((r) => r.json()).catch(() => null),
       fetch("/api/social/posts").then((r) => r.json()).catch(() => null),
       fetch("/api/media/assets").then((r) => r.json()).catch(() => null),
+      fetch("/api/social/metrics").then((r) => r.json()).catch(() => null),
     ]);
     if (a?.platforms) setPlatforms(a.platforms);
     setAccounts(a?.accounts ?? []);
     setPosts(p?.posts ?? []);
+    setMetrics(met?.metrics ?? []);
     setMedia(
       (m?.assets ?? []).filter(
         (x: MediaRow) => x.approval_status === "approved" && x.license_allows_hero,
@@ -112,6 +138,61 @@ export function SocialStudio() {
     );
     if (a?.setup) say("err", "Storage not configured — the studio is read-only.");
   }, []);
+
+  async function refreshNumbers(accountId?: string) {
+    setBusy(true);
+    try {
+      const r = await fetch("/api/social/metrics", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ mode: "refresh", accountId }),
+      });
+      const j = await r.json();
+      if (j.ok) {
+        say("ok", `Numbers refreshed for ${j.refreshed} account(s).`);
+        refresh();
+      } else say("err", j.detail ?? j.error ?? "Refresh failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function generate() {
+    if (gPlatforms.length === 0 || gBrief.trim().length < 3) return;
+    setGBusy(true);
+    setGDrafts([]);
+    try {
+      const r = await fetch("/api/social/generate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          platforms: gPlatforms,
+          brief: gBrief,
+          mediaFileIds: pMedia,
+          language: gLang,
+        }),
+      });
+      const j = await r.json();
+      if (j.ok) setGDrafts(j.drafts);
+      else if (j.setup) say("err", j.reason ?? "AI not configured.");
+      else say("err", j.detail ?? j.error ?? "Generation failed");
+    } finally {
+      setGBusy(false);
+    }
+  }
+
+  function applyDraft(d: GeneratedDraft) {
+    const acct = (accounts ?? []).find((a) => a.platform === d.platform && a.status === "connected");
+    if (acct) setPAccount(acct.id);
+    const tags = d.hashtags?.length ? `\n\n${d.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ")}` : "";
+    setPBody(`${d.caption}${tags}`);
+    setDraftId(null);
+    setDryRunInfo(null);
+    say("ok", `Loaded the ${d.platform} draft into the composer${acct ? "" : " — connect that platform to publish"}.`);
+  }
+
+  const latestMetric = (accountId: string): MetricRow | undefined =>
+    metrics.find((m) => m.account_id === accountId);
   useEffect(() => {
     refresh();
   }, [refresh]);
@@ -246,9 +327,19 @@ export function SocialStudio() {
       <Card>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg text-gold">Platform connections</h2>
-          <button type="button" onClick={refresh} aria-label="Refresh" className="text-white/40 hover:text-white">
-            <RefreshCw className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => refreshNumbers()}
+              disabled={busy}
+              className="rounded-full border border-hairline px-3 py-1 text-[11px] text-white/60 transition hover:border-gold/40 hover:text-white disabled:opacity-40"
+            >
+              Refresh all numbers
+            </button>
+            <button type="button" onClick={refresh} aria-label="Reload" className="text-white/40 hover:text-white">
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {platforms.map((spec) => {
@@ -281,20 +372,63 @@ export function SocialStudio() {
                     {acct?.status ?? "not set up"}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setConnectOpen(open ? null : spec.platform);
-                    setCHandle(acct?.handle ?? "");
-                    setCExternalId(acct?.external_account_id ?? "");
-                    setCToken("");
-                  }}
-                  className="mt-2 inline-flex items-center gap-1.5 text-xs text-gold hover:underline"
-                  aria-expanded={open}
-                >
-                  <PlugZap className="h-3.5 w-3.5" /> {acct?.has_token ? "Reconnect / update token" : "Connect"}
-                  <ChevronDown className={cn("h-3 w-3 transition", open && "rotate-180")} />
-                </button>
+                {acct && (() => {
+                  const m = latestMetric(acct.id);
+                  return m?.followers != null ? (
+                    <p className="mt-1.5 text-xs tabular-nums text-white/70">
+                      <span className="font-semibold text-white">{new Intl.NumberFormat("en-US").format(m.followers)}</span>{" "}
+                      followers
+                      {m.posts_count != null ? ` · ${m.posts_count} posts` : ""}
+                      <span className="text-white/35"> · {m.source === "manual" ? "manual" : "API"} · {m.captured_at.slice(0, 10)}</span>
+                    </p>
+                  ) : null;
+                })()}
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConnectOpen(open ? null : spec.platform);
+                      setCHandle(acct?.handle ?? "");
+                      setCExternalId(acct?.external_account_id ?? "");
+                      setCToken("");
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs text-gold hover:underline"
+                    aria-expanded={open}
+                  >
+                    <PlugZap className="h-3.5 w-3.5" /> {acct?.has_token ? "Reconnect / update token" : "Connect"}
+                    <ChevronDown className={cn("h-3 w-3 transition", open && "rotate-180")} />
+                  </button>
+                  {acct?.status === "connected" && spec.nativePublish && (
+                    <button
+                      type="button"
+                      onClick={() => refreshNumbers(acct.id)}
+                      disabled={busy}
+                      className="text-[11px] text-white/45 hover:text-white disabled:opacity-40"
+                    >
+                      Refresh numbers
+                    </button>
+                  )}
+                  {acct && !spec.nativePublish && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const v = window.prompt(`Current ${spec.label} follower count (manual entry, labeled as such):`);
+                        if (v == null || v.trim() === "" || !Number.isFinite(Number(v))) return;
+                        const r = await fetch("/api/social/metrics", {
+                          method: "POST",
+                          headers: { "content-type": "application/json" },
+                          body: JSON.stringify({ mode: "manual", accountId: acct.id, followers: Math.round(Number(v)) }),
+                        });
+                        const j = await r.json();
+                        if (j.ok) { say("ok", "Manual figure recorded."); refresh(); }
+                        else say("err", j.detail ?? j.error ?? "Save failed");
+                      }}
+                      className="text-[11px] text-white/45 hover:text-white"
+                    >
+                      Enter numbers manually
+                    </button>
+                  )}
+                </div>
                 {open && (
                   <div className="mt-3 space-y-2 border-t border-hairline pt-3">
                     <ul className="ms-4 list-disc space-y-0.5 text-[11px] text-white/45">
@@ -327,6 +461,110 @@ export function SocialStudio() {
               </div>
             );
           })}
+        </div>
+      </Card>
+
+      {/* ---------------- Generate content ---------------- */}
+      <Card>
+        <h2 className="mb-1 flex items-center gap-2 text-lg text-gold">
+          <Sparkles className="h-4 w-4" /> Generate content
+        </h2>
+        <p className="mb-3 text-[11px] text-white/40">
+          Pick platforms, describe the post (facts only — the AI never invents prices, availability, or
+          residency claims), and optionally select images in the composer below: their stored descriptions
+          are the only thing the AI knows about them. Drafts land in the composer for your review — nothing
+          publishes without a dry run.
+        </p>
+        <div className="space-y-3">
+          <div>
+            <span className={LABEL}>Platforms</span>
+            <div className="flex flex-wrap gap-1.5">
+              {platforms
+                .filter((s) => s.platform !== "whatsapp")
+                .map((s) => {
+                  const on = gPlatforms.includes(s.platform);
+                  return (
+                    <button
+                      key={s.platform}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() =>
+                        setGPlatforms(on ? gPlatforms.filter((x) => x !== s.platform) : [...gPlatforms, s.platform])
+                      }
+                      className={cn(
+                        "rounded-full border px-3 py-1 text-xs transition",
+                        on
+                          ? "border-gold bg-gold/15 text-gold"
+                          : "border-hairline text-white/50 hover:border-gold/40 hover:text-white",
+                      )}
+                    >
+                      {s.label}
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <label className="block sm:col-span-2">
+              <span className={LABEL}>Brief — project, community, facts, angle, tone</span>
+              <textarea
+                className={cn(FIELD, "h-24")}
+                value={gBrief}
+                onChange={(e) => setGBrief(e.target.value)}
+                placeholder="e.g. New release at Al Mouj Marina — 2BR marina-view apartments, ITC freehold, handover Q2 2027. Angle: waterfront lifestyle."
+              />
+            </label>
+            <label className="block">
+              <span className={LABEL}>Language</span>
+              <select className={FIELD} value={gLang} onChange={(e) => setGLang(e.target.value as "en" | "ar" | "both")}>
+                <option value="en">English</option>
+                <option value="ar">Arabic</option>
+                <option value="both">Bilingual EN + AR</option>
+              </select>
+            </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={gBusy || gPlatforms.length === 0 || gBrief.trim().length < 3}
+              onClick={generate}
+              className="inline-flex items-center gap-1.5 rounded-md bg-gold px-4 py-2 text-sm font-semibold text-ink transition hover:bg-gold-soft disabled:opacity-40"
+            >
+              <Sparkles className="h-4 w-4" /> {gBusy ? "Writing…" : "Generate drafts"}
+            </button>
+            <span className="text-[11px] text-white/35">
+              {pMedia.length > 0
+                ? `${pMedia.length} selected image(s) from the composer will inform the copy.`
+                : "No images selected — select some in the composer to ground the copy."}
+            </span>
+          </div>
+          {gDrafts.length > 0 && (
+            <ul className="space-y-2">
+              {gDrafts.map((d, i) => (
+                <li key={`${d.platform}-${i}`} className="rounded-xl border border-hairline bg-ink-900/40 p-3.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gold">{d.platform}</p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm text-white/85">{d.caption}</p>
+                      {d.hashtags && d.hashtags.length > 0 && (
+                        <p className="mt-1.5 text-xs text-white/50">
+                          {d.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ")}
+                        </p>
+                      )}
+                      {d.notes && <p className="mt-1.5 text-[11px] italic text-white/35">{d.notes}</p>}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => applyDraft(d)}
+                      className="shrink-0 rounded-md border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold transition hover:bg-gold/20"
+                    >
+                      Use in composer
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </Card>
 

@@ -104,10 +104,38 @@ second hand-maintained catalog.
 - UI: `/settings/social` — connection cards for all 8 platforms with per-
   platform credential checklists, composer, dry-run→publish flow, history.
 - NOT yet done: scheduled posting (needs the cron backbone phase),
-  metrics ingestion job, TikTok/YouTube/LinkedIn/X/Threads adapters
+  TikTok/YouTube/LinkedIn/X/Threads adapters
   (activate per-platform when owner supplies developer-app credentials),
   n8n Publisher decommission (stays until native Meta path is verified
   with real credentials).
+
+## Social Phase 1b — direct numbers + AI content generation (built 2026-08-08)
+
+- Metrics: `SocialPublisher.fetchMetrics` on the adapter interface (Meta:
+  FB `fan_count`, IG `followers_count`/`media_count`; pending platforms
+  return an honest error). `/api/social/metrics`: GET latest snapshots;
+  POST `mode:"refresh"` (per connected account via adapter, 30-min
+  cooldown on API-sourced snapshots) or `mode:"manual"` (owner-entered
+  figure, stored with `source='manual'` and always labeled as such in UI).
+  Both audited. No cron yet — refresh is button-driven until the
+  scheduling backbone phase.
+- Dashboard: `loadSocialPulse()` (`src/app/_data/socialPulse.ts`) reads
+  the latest two snapshots per account (followers + delta) and the 30-day
+  posted count; `SocialPulseCard` in the Command Portal rail shows each
+  account's followers, delta, source label ("live API" vs "manual entry")
+  and as-of date. Disconnected platforms say "Not connected" — never zeros.
+- AI content generation: `/api/social/generate` — owner brief + selected
+  approved media (the model sees only stored alt text / vision captions /
+  classification, never raw pixels) → one caption per chosen platform,
+  constraints injected from the platform registry. Guardrails: facts only
+  from brief/image descriptions, renders never presented as real, no
+  return/residency guarantees, ITC-only rule for foreign-facing copy,
+  platform hashtag norms. Strict JSON+zod validation, 10/min rate limit,
+  audited, `{setup:true}` without ANTHROPIC_API_KEY. EN / AR / bilingual.
+- UI: `/settings/social` gained a "Generate content" card (platform chips,
+  brief, language) whose drafts load into the composer via "Use in
+  composer" — generated copy still goes through the same
+  dry-run → publish gate; nothing auto-publishes.
 
 ## Build log
 
@@ -119,3 +147,5 @@ second hand-maintained catalog.
   in live.
 - 2026-08-09: Drift inspection (this file); RLS gate closed via 0012
   (applied live + mirrored in repo).
+- 2026-08-08: Social Phase 1 (migration 0013, applied live) + Phase 1b
+  (metrics + Command Portal social pulse + AI caption generation).

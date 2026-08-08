@@ -33,11 +33,22 @@ export interface PublishResult {
   error?: string;
 }
 
+export interface MetricsResult {
+  ok: boolean;
+  followers?: number | null;
+  postsCount?: number | null;
+  /** Platform-specific extras stored in the snapshot's jsonb. */
+  extra?: Record<string, number | string | null>;
+  error?: string;
+}
+
 export interface SocialPublisher {
   /** Read-only credential/account check — safe for dry runs. */
   verify(account: AccountRef, accessToken: string): Promise<VerifyResult>;
   /** Performs the real-world post. Only called after a passed dry run. */
   publish(request: PublishRequest): Promise<PublishResult>;
+  /** Read-only account metrics (followers etc.) for the dashboard. */
+  fetchMetrics(account: AccountRef, accessToken: string): Promise<MetricsResult>;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,6 +167,31 @@ export const metaPublisher: SocialPublisher = {
 
     return { ok: false, error: `Meta adapter does not handle ${req.account.platform}` };
   },
+
+  async fetchMetrics(account, accessToken) {
+    const id = account.externalAccountId;
+    if (!id) return { ok: false, error: "Missing account ID" };
+    if (account.platform === "facebook") {
+      const r = await graph<{ fan_count?: number; followers_count?: number }>(`/${id}`, accessToken, {
+        params: { fields: "fan_count,followers_count" },
+      });
+      if (!r.ok) return { ok: false, error: r.error };
+      return {
+        ok: true,
+        followers: r.data.followers_count ?? r.data.fan_count ?? null,
+        postsCount: null,
+        extra: { fanCount: r.data.fan_count ?? null },
+      };
+    }
+    if (account.platform === "instagram") {
+      const r = await graph<{ followers_count?: number; media_count?: number }>(`/${id}`, accessToken, {
+        params: { fields: "followers_count,media_count" },
+      });
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, followers: r.data.followers_count ?? null, postsCount: r.data.media_count ?? null };
+    }
+    return { ok: false, error: `Meta adapter does not handle ${account.platform}` };
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -169,6 +205,9 @@ export function pendingPublisher(platform: SocialPlatform): SocialPublisher {
       return { ok: false, detail: msg };
     },
     async publish() {
+      return { ok: false, error: msg };
+    },
+    async fetchMetrics() {
       return { ok: false, error: msg };
     },
   };
