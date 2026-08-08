@@ -82,6 +82,33 @@ project / community → easily listable on any platform" — i.e. `units` +
 GENERATED from them (publish step + per-platform export adapters), not a
 second hand-maintained catalog.
 
+## Social connections (Phase 1 of the automation plan — built 2026-08-09)
+
+- Migration `0013_social_platform` (applied live + repo): `social_accounts`
+  (org RLS), `social_account_secrets` (NO policies — service-role only,
+  tokens never client-readable), `social_posts` (unique
+  `(organization_id, idempotency_key)`, dry-run gate), `social_metrics_snapshots`.
+- Domain `src/domain/social/`: 8-platform registry with honest capability
+  flags + connect checklists, per-platform post validation, deterministic
+  idempotency keys, state machine where live publishing is ONLY reachable
+  via `dry_run_ok`. 10 tests.
+- Adapters `src/infrastructure/social/publisher.ts`: one `SocialPublisher`
+  interface; native **Meta Graph** adapter (FB Page photo/feed +
+  multi-photo, IG container/carousel flow, read-only verify); pending
+  platforms return honest "adapter not shipped" — never fake success.
+- API: `/api/social/accounts` (connect/verify/disconnect, audited),
+  `/api/social/posts` (drafts; edits reset to draft), `/api/social/posts/publish`
+  (dry_run validates token+media+rules with zero external writes; live is
+  compare-and-set guarded, idempotent, audited). Posts may only use
+  APPROVED, publicly-licensed media from the 0011 library.
+- UI: `/settings/social` — connection cards for all 8 platforms with per-
+  platform credential checklists, composer, dry-run→publish flow, history.
+- NOT yet done: scheduled posting (needs the cron backbone phase),
+  metrics ingestion job, TikTok/YouTube/LinkedIn/X/Threads adapters
+  (activate per-platform when owner supplies developer-app credentials),
+  n8n Publisher decommission (stays until native Meta path is verified
+  with real credentials).
+
 ## Build log
 
 - 2026-06→07: CRM core, copilot tool-loop, migrations 0000–0009 (see git

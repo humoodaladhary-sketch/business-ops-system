@@ -10,6 +10,7 @@ const SECTIONS = [
   { href: "/settings/targets", title: "Targets", sub: "Monthly sales target per advisor." },
   { href: "/settings/copilot", title: "Copilot Voice", sub: "Tone, personality and behavior of the department copilots." },
   { href: "/settings/hero", title: "Hero & Media", sub: "Portal banner slides, licensed imagery, approvals, focal points." },
+  { href: "/settings/social", title: "Social Connections", sub: "Connect FB/IG/TikTok/YouTube/LinkedIn/X/Threads; compose, dry-run, publish." },
   { href: "/admin/users", title: "User Access", sub: "Create logins — email, password, role." },
   { href: "/inventory", title: "Inventory", sub: "Units across off-plan & secondary, publish to feeds." },
 ];
