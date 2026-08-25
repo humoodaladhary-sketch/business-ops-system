@@ -149,3 +149,65 @@ second hand-maintained catalog.
   (applied live + mirrored in repo).
 - 2026-08-08: Social Phase 1 (migration 0013, applied live) + Phase 1b
   (metrics + Command Portal social pulse + AI caption generation).
+- 2026-08-25: Readiness audit (see below). 0010 + 0011 applied live; storage
+  bucket casing, publish-history and metrics-reporting defects fixed.
+
+## Readiness audit — 2026-08-25
+
+Audited the built system against the LIVE project rather than the repo alone.
+Four things meant the deployed code could not actually run; all are fixed.
+
+**Live migration state (corrected).** 0000–0009, 0012, 0013 were applied;
+**0010 and 0011 were not** — they existed only in the repo. Without 0011 the
+live `files` table had none of `approval_status`, `license_allows_hero`,
+`alt_text`, `classification`, `location_label`, so `/api/media/assets`
+errored, the media picker was empty, no post could carry an image, and
+Instagram (which requires media) could not publish at all. Both are now
+applied live and verified. **Every migration in the repo is now applied
+live** — check this before assuming a column exists.
+
+**Storage bucket casing.** The code used `"alwalaa"`; the live bucket id is
+`ALWALAA`. Supabase bucket ids are case-sensitive, so every `createSignedUrls`
+and upload returned "Bucket not found". Now one constant,
+`MEDIA_BUCKET` in `src/lib/storage.ts` (override with `SUPABASE_MEDIA_BUCKET`),
+used by the media assets/upload routes, the hero loader and the publish path.
+The other live bucket, `real-estate` (public), belongs to the listing site.
+
+**Published posts are immutable.** `postIdempotencyKey` is derived from the
+content, so re-composing an already-published post produced the SAME key and
+the upsert overwrote the posted row — clearing `posted`, keeping a stale
+`external_post_id`, and re-opening the publish gate on something already live.
+The decision is now `resolveDraftWrite()` in `src/domain/social/posting.ts`
+(pure + tested, 5 cases); a collision with a posted row returns 409
+`already_posted`.
+
+**Honest feedback.** Metrics refresh counted cooldown skips as refreshes and
+returned a green result even when every account failed, hiding the platform's
+real error. It now separates updated / already-fresh / failed and surfaces
+failures. Account reconnect no longer wipes `external_account_id` /
+`display_name` when only a token is supplied, and verifies against the stored
+account id.
+
+**Known, NOT fixed (needs an explicit RLS decision).** `public.auth_org()` is
+`STABLE` but **not** `SECURITY DEFINER`, so it reads `profiles`, whose own RLS
+policy calls `auth_org()` again — infinite recursion. Any non-service-role
+query against the ten tables whose policies use it (`files`, `units`,
+`projects`, `listings`, `buyer_profiles`, `reports`, `roi_scores`,
+`unit_fields`, `organizations`, `profiles`) fails with "stack depth limit
+exceeded". Invisible today because the app reads through the service role,
+which bypasses RLS — but it breaks the moment per-user auth is switched on.
+The later helper `my_org()` (used by 0010/0011/0013) is already correct:
+`SECURITY DEFINER` with `search_path=public`. Fix is to redefine `auth_org()`
+the same way; anon still resolves to null → zero rows. Awaiting approval
+because it changes a security boundary.
+
+**Environment required to run.** `SUPABASE_SERVICE_ROLE_KEY` (without it every
+social route returns `{setup:true}` and the studio is read-only),
+`ANTHROPIC_API_KEY` (caption generation and the copilot),
+`SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD` (admin session — every social route
+is admin-gated), `DATABASE_URL` (Prisma audit log; audits are best-effort and
+silently skip without it). Optional: `SUPABASE_MEDIA_BUCKET`, `ANTHROPIC_MODEL`.
+`INTERNAL_API_TOKEN` is still open-by-default on `/api/sync` — unchanged gap.
+
+**Live data state at audit time:** 0 social accounts, 0 posts, 0 snapshots,
+0 files. Nothing is connected yet — the system is ready, but empty.
