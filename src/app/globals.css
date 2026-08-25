@@ -75,3 +75,9 @@ h3,
   .report-sheet { box-shadow: none !important; border-radius: 0 !important; max-width: none !important; }
   @page { margin: 12mm; }
 }
+
+/* Hero carousel: timed progress for the active slide (motion-safe only). */
+@keyframes heroProgress {
+  from { width: 0%; }
+  to { width: 100%; }
+}

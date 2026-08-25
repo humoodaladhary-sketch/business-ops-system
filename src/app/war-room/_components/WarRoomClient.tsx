@@ -1,14 +1,17 @@
 "use client";
 
 // Pro Mode workspace (route: /war-room). Tabs: Offer, Compare, Calculators,
-// ITC Map. Live inventory arrives from the server page; the header carries the
-// refreshed Pro look — a deep-garnet banner in the portal design language.
+// Invest, ITC Map. Live inventory arrives from the server page; the header
+// carries the refreshed Pro look — a deep-garnet banner in the portal design
+// language. The Invest tab can hand its analysed unit + suggested price to
+// the Offer tab (offerPrefill remounts the builder with the new unit).
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import { Swords, Calculator, FileText, Map as MapIcon, Scale } from "lucide-react";
+import { Swords, Calculator, FileText, Map as MapIcon, Scale, TrendingUp } from "lucide-react";
 import { Calculators } from "./Calculators";
 import { OfferBuilder } from "./OfferBuilder";
 import { CompareBuilder } from "./CompareBuilder";
+import { InvestBuilder } from "./invest/InvestBuilder";
 import { ITC_PROJECTS } from "../../_data/itc-zones";
 import type { LiveOfferUnit } from "../../_data/warRoomUnits";
 import type { OfferUnit } from "@/domain/realestate/offer";
@@ -41,6 +44,7 @@ const TABS = [
   { id: "offer", label: "Offer", icon: FileText },
   { id: "compare", label: "Compare", icon: Scale },
   { id: "calc", label: "Calculators", icon: Calculator },
+  { id: "invest", label: "Invest", icon: TrendingUp },
   { id: "map", label: "ITC Map", icon: MapIcon },
 ] as const;
 
@@ -48,11 +52,18 @@ type TabId = (typeof TABS)[number]["id"];
 
 export function WarRoomClient({ liveUnits }: { liveUnits: LiveOfferUnit[] }) {
   const [tab, setTab] = useState<TabId>("offer");
+  const [offerPrefill, setOfferPrefill] = useState<OfferUnit | null>(null);
+
+  /** Invest → Offer handoff: seed the builder with the analysed unit + price. */
+  function sendToOffer(unit: OfferUnit) {
+    setOfferPrefill(unit);
+    setTab("offer");
+  }
 
   return (
     <div className="space-y-5">
       {/* Pro banner — portal hero language in the closing-mode palette */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#2A1114] via-[#1A0F10] to-[#0F0D0B] p-6 shadow-xl sm:p-8">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#2A1114] via-[#1A0F10] to-[#0F0D0B] p-6 shadow-xl print:hidden sm:p-8">
         <div aria-hidden className="pointer-events-none absolute -end-20 -top-20 h-64 w-64 rounded-full bg-gold/10 blur-3xl" />
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -93,9 +104,17 @@ export function WarRoomClient({ liveUnits }: { liveUnits: LiveOfferUnit[] }) {
         </div>
       </div>
 
-      {tab === "offer" && <OfferBuilder liveUnits={liveUnits} catalog={CATALOG_UNITS} />}
+      {tab === "offer" && (
+        <OfferBuilder
+          key={offerPrefill ? `${offerPrefill.reference}-${offerPrefill.priceOmr}` : "blank"}
+          liveUnits={liveUnits}
+          catalog={CATALOG_UNITS}
+          prefill={offerPrefill}
+        />
+      )}
       {tab === "compare" && <CompareBuilder liveUnits={liveUnits} />}
       {tab === "calc" && <Calculators />}
+      {tab === "invest" && <InvestBuilder liveUnits={liveUnits} onSendToOffer={sendToOffer} />}
       {tab === "map" && <ItcMap />}
     </div>
   );

@@ -4,14 +4,29 @@ import {
   ArrowUpRight, AlertTriangle, BarChart3, Building2, CalendarX2, FileText, Map,
   Megaphone, Sparkles, Swords, TrendingUp, Users, Wallet,
 } from "lucide-react";
-import { computePace } from "@/domain";
+import { computePace, STAGE_LABELS } from "@/domain";
 import { AGING_BUCKET_LABELS, type AgingBucket } from "@/domain/finance/aging";
+import { summarizeFollowups } from "@/domain/crm/followup";
+import { lastDeltaPct, monthlySeries, summarizeFunnel } from "@/domain/crm/funnel";
+import { getSession } from "@/infrastructure/auth/session";
 import { getDemoAgents, dashboardPeriod } from "./_data/demo";
 import { loadData } from "./_data/source";
 import { loadFinanceSummary } from "./_data/live";
 import { loadInboxTasks, loadUnitCounts } from "./_data/portal";
 import { loadNews } from "./_data/news";
-import { PortalHero, type HeroSlide } from "./components/PortalHero";
+import { loadPortalVisuals } from "./_data/portalVisuals";
+import { loadSocialPulse } from "./_data/socialPulse";
+import { SocialPulseCard } from "./components/portal/SocialPulseCard";
+import { PortalHero, type VisualHeroSlide } from "./components/PortalHero";
+import { Sparkline } from "./components/portal/Sparkline";
+import { OmanMiniMap } from "./components/portal/OmanMiniMap";
+import {
+  AgingBar,
+  FeaturedProjectsSection,
+  FunnelStrip,
+  NewsCardsStrip,
+  OpportunityCard,
+} from "./components/portal/PortalVisuals";
 import { formatOMR, formatPct } from "./lib/format";
 import { cn } from "./lib/cn";
 
@@ -52,13 +67,16 @@ const SYSTEM_TILES: Tile[] = [
 ];
 
 export default async function PortalHome() {
-  const [data, finance, inbox, unitCounts, news] = await Promise.all([
+  const [data, finance, inbox, unitCounts, news, session, socialPulse] = await Promise.all([
     loadData(),
     loadFinanceSummary(),
     loadInboxTasks(),
     loadUnitCounts(),
     loadNews(6),
+    getSession(),
+    loadSocialPulse(),
   ]);
+  const visuals = await loadPortalVisuals(news, session?.role ?? "ADMIN");
   const period = dashboardPeriod(data);
   const { day: dayOfMonth, days: daysInMonth } = paceClock(data.live, period);
   const agents = getDemoAgents(data, period);
@@ -73,33 +91,64 @@ export default async function PortalHome() {
   const atRisk = agents.filter((a) => a.atRisk.atRisk);
   const watch = agents.filter((a) => a.atRisk.watch && !a.atRisk.atRisk);
 
-  // Hero slides — live business news first (OBB-portal style), with the cash
-  // call-to-action pinned ahead of it whenever collections are overdue. Every
-  // figure comes from live/loaded data; missing data means no slide.
-  const slides: HeroSlide[] = [];
-  const NEWS_TONES: HeroSlide["tone"][] = ["ink", "bronze", "gold"];
-  news.slice(0, 4).forEach((n, i) => {
+  // Hero slides — editorial (curated, licensed imagery) and live business
+  // content, with the cash call-to-action pinned first whenever collections
+  // are overdue. Every figure comes from live/loaded data; missing data means
+  // no slide; missing imagery means branded fallback art, never a random photo.
+  const slides: VisualHeroSlide[] = [];
+
+  // 1 · Curated editorial slides (scheduled + approved in /settings/hero).
+  visuals.editorial.forEach((e) => {
+    const external = (href: string | null) => Boolean(href && /^https?:\/\//.test(href));
     slides.push({
+      id: `ed-${e.row.id}`,
+      badge: e.badge,
+      kicker: e.row.eyebrow ?? e.row.sourceLabel ?? undefined,
+      title: e.row.title,
+      body: e.row.description ?? undefined,
+      primary:
+        e.row.primaryLabel && e.row.primaryHref
+          ? { label: e.row.primaryLabel, href: e.row.primaryHref, external: external(e.row.primaryHref) }
+          : undefined,
+      secondary:
+        e.row.secondaryLabel && e.row.secondaryHref
+          ? { label: e.row.secondaryLabel, href: e.row.secondaryHref, external: external(e.row.secondaryHref) }
+          : undefined,
+      tone: "gold",
+      image: e.image,
+      art: "map",
+    });
+  });
+
+  // 2 · Live market news (image only when a licensed asset matches the story).
+  const NEWS_TONES: VisualHeroSlide["tone"][] = ["ink", "bronze", "gold"];
+  news.slice(0, 3).forEach((n, i) => {
+    slides.push({
+      id: `news-${i}`,
+      badge: "Market update",
       meta: n.publishedAt ? n.publishedAt.slice(0, 10) : undefined,
       // Google News is a discovery aggregator, not verification — say so.
       kicker: `Aggregated news · ${n.source}`,
       title: n.title,
-      body: "",
-      href: n.link,
-      cta: "Read more",
+      primary: { label: "Read article", href: n.link, external: true },
+      secondary: { label: "All news", href: "/news" },
       tone: NEWS_TONES[i % NEWS_TONES.length],
-      external: true,
+      image: visuals.newsImages[i],
+      art: "map",
     });
   });
+
   if (finance) {
     // Overdue cash outranks headlines — pin it as the first slide.
     slides[finance.overdueCount > 0 ? "unshift" : "push"]({
+      id: "finance",
+      badge: finance.overdueCount > 0 ? "Collections priority" : "Finance",
       kicker: "Finance · live from Zoho Books",
       title: `${formatOMR(finance.outstandingOMR, true)} outstanding to collect`,
       body: `${formatOMR(finance.invoicedOMR, true)} invoiced across ${finance.invoiceCount} commission invoices · ${formatOMR(finance.collectedOMR, true)} recorded collected · ${finance.overdueCount} overdue worth ${formatOMR(finance.overdueOMR, true)}.`,
-      href: "/departments/finance",
-      cta: "Chase collections",
+      primary: { label: "Chase collections", href: "/departments/finance" },
       tone: finance.overdueCount > 0 ? "risk" : "gold",
+      art: "chart",
     });
   }
   const lastClose = data.deals
@@ -107,40 +156,86 @@ export default async function PortalHome() {
     .sort((a, b) => (a.closeDate! < b.closeDate! ? 1 : -1))[0];
   if (lastClose) {
     slides.push({
-      kicker: "Latest closing",
+      id: "last-close",
+      badge: "Latest closing",
+      kicker: "Sales",
       title: `${lastClose.client} — ${formatOMR(lastClose.value, true)}`,
       body: `${lastClose.project} · ${lastClose.developer}${lastClose.unitNumber ? ` · unit ${lastClose.unitNumber}` : ""} · closed ${lastClose.closeDate}.`,
-      href: "/deals",
-      cta: "All deals",
+      primary: { label: "All deals", href: "/deals" },
       tone: "gold",
+      art: "grid",
     });
   }
+  // Follow-up nudges run on live rows only — a snapshot's touch dates are
+  // frozen history and would fabricate staleness against today's clock.
+  const followups = data.live
+    ? summarizeFollowups(
+        data.leads.map((l) => ({
+          id: l.id,
+          name: l.name,
+          stage: l.stage,
+          lastTouch: l.lastFollowUp,
+          registeredOn: l.registeredOn,
+        })),
+        new Date(),
+      )
+    : null;
+
   const openLeads = data.leads.filter((l) => !["CLOSED_WON", "CLOSED_LOST"].includes(l.stage));
   if (openLeads.length > 0) {
     slides.push({
-      kicker: "Pipeline",
+      id: "pipeline",
+      badge: "Pipeline",
+      kicker: "Sales pipeline",
       title: `${openLeads.length} investors in play`,
       body: `Period ${period}: ${formatOMR(teamVolume, true)} closed of ${formatOMR(teamTarget, true)} target (${formatPct(attainment)}) · ${closings} closings.`,
-      href: "/pipeline",
-      cta: "Open pipeline",
+      primary: { label: "Open pipeline", href: "/pipeline" },
       tone: "ink",
+      art: "chart",
     });
   }
   if (unitCounts) {
     const available = unitCounts.available ?? 0;
     const total = Object.values(unitCounts).reduce((s, n) => s + n, 0);
     slides.push({
+      id: "inventory",
+      badge: "New inventory",
       kicker: "Inventory · live",
       title: `${available} units available to sell`,
       body: `${total} units tracked · ${unitCounts.reserved ?? 0} reserved · ${unitCounts.sold ?? 0} sold. The single source of truth for what Alwalaa can pitch today.`,
-      href: "/inventory",
-      cta: "Browse inventory",
+      primary: { label: "Browse inventory", href: "/inventory" },
+      secondary: { label: "Analyze a deal", href: "/war-room" },
       tone: "bronze",
+      art: "grid",
     });
   }
+  const heroSlides = slides.slice(0, 6); // bounded carousel — bounded image payload
 
-  const kpis = [
-    { label: "Sales volume", value: formatOMR(teamVolume, true), hint: `${closings} closings · ${period}` },
+  // Market-pulse trends: closed volume per month (live rows only, zero-filled).
+  const volumeSeries = monthlySeries(
+    data.deals.filter((d) => d.stage === "CLOSED_WON").map((d) => ({ period: d.period, value: d.value })),
+    period,
+    6,
+  );
+  const volumeDelta = lastDeltaPct(volumeSeries);
+  const funnel = summarizeFunnel(data.leads.map((l) => ({ stage: l.stage })));
+
+  interface Kpi {
+    label: string;
+    value: string;
+    hint: string;
+    accent?: boolean;
+    spark?: number[];
+    deltaPct?: number | null;
+  }
+  const kpis: Kpi[] = [
+    {
+      label: "Sales volume",
+      value: formatOMR(teamVolume, true),
+      hint: `${closings} closings · ${period}`,
+      spark: volumeSeries.map((p) => p.value),
+      deltaPct: volumeDelta,
+    },
     { label: "Net commission", value: formatOMR(teamGross - teamPayout, true), hint: "company, after splits" },
     { label: "Attainment", value: formatPct(attainment), hint: `of ${formatOMR(teamTarget, true)} target` },
     ...(finance
@@ -188,7 +283,7 @@ export default async function PortalHome() {
         {/* ---------------- Main column ---------------- */}
         <div className="min-w-0 space-y-6">
           <div>
-            <PortalHero slides={slides} />
+            <PortalHero slides={heroSlides} />
             <div className="mt-2 flex items-center justify-between px-1">
               <p className={cn("text-[11px]", MUTED)}>
                 {news.length > 0 ? "Live market feed — Oman real estate, MoHUP, Omran & partners · refreshes ~30 min" : "Business highlights"}
@@ -199,18 +294,50 @@ export default async function PortalHome() {
             </div>
           </div>
 
-          {/* KPI band */}
+          {/* Visual news cards — the stories behind the hero, at a glance */}
+          <NewsCardsStrip items={visuals.newsCards.slice(0, 3)} />
+
+          {/* Market pulse band */}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
             {kpis.map((k) => (
               <div key={k.label} className={cn(CARD, "p-4")}>
                 <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#15131180]">{k.label}</div>
-                <div className={cn("mt-2 font-heading text-2xl tabular-nums", "accent" in k && k.accent ? "text-[#9C6B3B]" : "")}>
+                <div className={cn("mt-2 font-heading text-2xl tabular-nums", k.accent ? "text-[#9C6B3B]" : "")}>
                   {k.value}
                 </div>
-                <div className={cn("mt-1 text-[11px]", MUTED)}>{k.hint}</div>
+                <div className="mt-1 flex items-center justify-between gap-1">
+                  <span className={cn("text-[11px]", MUTED)}>{k.hint}</span>
+                  {k.spark && k.spark.some((v) => v !== 0) && <Sparkline values={k.spark} />}
+                </div>
+                {k.deltaPct != null && (
+                  <div
+                    className={cn(
+                      "mt-1 text-[10px] font-semibold tabular-nums",
+                      k.deltaPct >= 0 ? "text-emerald-700" : "text-red-700",
+                    )}
+                    title="Change vs previous month (closed volume, live rows)"
+                  >
+                    {k.deltaPct >= 0 ? "▲" : "▼"} {Math.abs(k.deltaPct)}% vs prev month
+                  </div>
+                )}
               </div>
             ))}
           </div>
+
+          {/* Featured projects + investment pick */}
+          {(visuals.featuredProjects.length > 0 || visuals.opportunity) && (
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+              <FeaturedProjectsSection projects={visuals.featuredProjects} />
+              {visuals.opportunity && (
+                <div className={visuals.featuredProjects.length > 0 ? "lg:mt-10" : ""}>
+                  <OpportunityCard unit={visuals.opportunity} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Sales funnel */}
+          <FunnelStrip funnel={funnel} />
 
           {/* Department launcher */}
           <section>
@@ -242,6 +369,7 @@ export default async function PortalHome() {
               <p className={cn("mt-0.5 text-[11px]", MUTED)}>
                 {finance.aging.openCount} open invoices · {formatOMR(finance.aging.openAmountOmr, true)} to collect
               </p>
+              <AgingBar buckets={finance.aging.buckets} />
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {(Object.entries(finance.aging.buckets) as [AgingBucket, { count: number; amountOmr: number }][])
                   .filter(([, v]) => v.count > 0)
@@ -289,6 +417,67 @@ export default async function PortalHome() {
                 <p className={cn("mt-2 text-[10px]", MUTED)}>
                   {finance.aging.buckets.due_date_unverified.count} invoices have unverified due dates — set them (with the
                   contractual basis) before treating them as overdue.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Follow-up queue — pipeline twin of the collections chase */}
+          {followups && followups.dueCount > 0 && (
+            <div className={cn(CARD, "p-5")}>
+              <h2 className="font-heading text-xl">Follow-up queue</h2>
+              <p className={cn("mt-0.5 text-[11px]", MUTED)}>
+                {followups.dueCount} of {followups.openCount} open leads need a touch
+              </p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {followups.staleCount > 0 && (
+                  <span className="rounded-full border border-red-300 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-700">
+                    Stale: {followups.staleCount}
+                  </span>
+                )}
+                {followups.noTouchCount > 0 && (
+                  <span className="rounded-full border border-amber-400/50 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                    No touch recorded: {followups.noTouchCount}
+                  </span>
+                )}
+                {Object.entries(followups.byStage).map(([stage, count]) => (
+                  <span key={stage} className="rounded-full border border-[#15131121] px-2 py-0.5 text-[10px] font-medium text-[#151311a6]">
+                    {STAGE_LABELS[stage as keyof typeof STAGE_LABELS] ?? stage}: {count}
+                  </span>
+                ))}
+              </div>
+              <ul className="mt-4 space-y-2">
+                {followups.queue.slice(0, 3).map((n) => (
+                  <li key={n.id} className="rounded-xl border border-[#15131114] bg-white/80 p-3">
+                    <div className="flex items-baseline justify-between gap-2 text-sm">
+                      <span className="min-w-0 truncate font-medium">{n.name}</span>
+                      <span className={cn("shrink-0 text-[11px] font-semibold", MUTED)}>
+                        {STAGE_LABELS[n.stage] ?? n.stage}
+                      </span>
+                    </div>
+                    <p className={cn("mt-0.5 text-[11px]", MUTED)}>
+                      {n.reason === "stale" ? (
+                        <span className="font-semibold text-red-700">
+                          {n.daysSinceTouch} days since last touch · {n.daysOverThreshold} past the {n.thresholdDays}d window
+                        </span>
+                      ) : (
+                        <span className="font-semibold text-amber-700">
+                          No touch recorded{n.daysSinceRegistered != null ? ` · registered ${n.daysSinceRegistered}d ago` : ""}
+                        </span>
+                      )}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/departments/sales"
+                className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-[#9C6B3B] hover:underline"
+              >
+                Open Sales copilot to work the queue <ArrowUpRight className="h-3 w-3" />
+              </Link>
+              {followups.noTouchCount > 0 && (
+                <p className={cn("mt-2 text-[10px]", MUTED)}>
+                  &ldquo;No touch recorded&rdquo; means exactly that — log the real last contact before judging these stale.
                 </p>
               )}
             </div>
@@ -377,6 +566,12 @@ export default async function PortalHome() {
               </div>
             )}
           </div>
+
+          {/* Social pulse — direct numbers from connected platforms */}
+          {socialPulse && <SocialPulseCard pulse={socialPulse} />}
+
+          {/* Oman opportunity map */}
+          <OmanMiniMap />
         </aside>
       </div>
     </div>
