@@ -13,10 +13,11 @@ re-verify before trusting it later).
   `properties`, `investment_metrics` — camelCase/Prisma).
 - Live migration history is partial: 0000–0005 were pasted without history;
   tracked versions: 0006, 0008, 0009, 0012.
-- **Applied to live:** 0000–0009 + `0012_listing_rls` (2026-08-09).
-- **Written but NOT yet applied to live:** `0010_investment_analysis`,
-  `0011_visual_media` (Invest save/report + hero studio run setup-degraded
-  until applied).
+- **Applied to live: ALL repo migrations 0000–0013** — 0000–0009 +
+  `0012_listing_rls` (2026-08-09), `0013_social_platform` (2026-08-08), and
+  `0010_investment_analysis` + `0011_visual_media` (2026-08-25, during the
+  readiness audit; they had been written but never applied, which broke the
+  media library and every image-bearing social post — see the audit section).
 
 ## Security state (verified 2026-08-09)
 
