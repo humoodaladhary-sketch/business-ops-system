@@ -159,6 +159,46 @@ deals (ALE-0002, ALE-0003) record an agent cut of unit value ÷ 120 rather than 
 gross — **58.416 OMR** of under-paid advisor cut. `agentCutAnomalies()` reports it.
 The published figures are untouched: the recorded amounts are what was actually paid.
 
+## The CEO agent
+
+The calc layer is wired into the existing department copilot as a `ceo` department
+(`/departments/ceo`), so the CEO can ask questions in plain language and get answers
+computed from the record rather than recalled from a prompt.
+
+**Eleven tools**, all of which recompute through `lib/calc`:
+
+| Tool | Answers |
+|---|---|
+| `company_position` | where we stand, rates, this month's pace and break-even |
+| `person_report` | one person across today / month / quarter / since day one |
+| `people_standings` | everyone's cost, contribution and direction, advisors ranked |
+| `month_detail` | one month in full, per person, with the policy in force |
+| `cost_and_break_even` | what we cost and must sell, under any month's rules |
+| `trend_by_month` | the month-by-month series, company-wide or per person |
+| `list_deals` | the underlying record, filtered |
+| `cash_gap` | awaiting invoice, awaiting collection, referrals owed out |
+| `data_quality` | what the system knows it does not know |
+| `settings_and_scenarios` | targets, bands, policies, the re-basing scenario |
+| `bonus_check` | which band a volume falls in and what the next one needs |
+
+**Live, in the sense that matters.** `src/lib/ceoData.ts` reads `data/ceo/` at request
+time behind a 15-second cache and re-parses only when the files actually change. Nothing
+is snapshotted into a prompt or baked in at build time, so editing the seed changes the
+next answer with no deploy. `next.config.mjs` traces `data/ceo/**` into the copilot
+function, which the build verifies. When the CEO schema lands, only `readDataFiles`
+changes — every tool stays put.
+
+**It runs without a database.** The tools read no DB, so they carry `needsDb: false` and
+the department is `requiresDb: false`; `runCopilot` now runs the full tool-loop for such a
+department even where no Supabase service-role client is configured. It needs only
+`ANTHROPIC_API_KEY`. The shared inbox/handoff/task tools are deliberately excluded,
+because those do write to the database.
+
+**The rules are enforced in the tools, not just asked for in the prompt.** A role's
+metrics are null rather than zero when they do not apply; the founder gets no advisor
+target or bonus band; pace returns no projection before working day 3; gaps come back as
+gaps. A prompt can be ignored — a null cannot be mistaken for a zero.
+
 ## What is deliberately not here
 
 Screens. Per the build order, nothing else starts until this passes — and it does.
