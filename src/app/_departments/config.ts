@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AGING_BUCKET_LABELS, OPEN_INVOICE_STATUSES, summarizeAging } from "@/domain/finance/aging";
+import { ceoTools } from "./ceoTools";
 
 // The single organization (owner-only mode).
 export const ORG_ID = "6a32be59-155d-4662-9058-3a74fb2b6872";
@@ -10,11 +11,18 @@ export interface CopilotTool {
   name: string;
   description: string;
   input_schema: { type: "object"; properties: Record<string, unknown>; required?: string[] };
+  /**
+   * False for tools that read no database — they run even where no Supabase
+   * service-role client is configured. Defaults to true.
+   */
+  needsDb?: boolean;
   run: (db: SupabaseClient, input: ToolInput, deptId: string) => Promise<unknown>;
 }
 
 export interface Department {
   id: DeptId;
+  /** False when every tool reads no database — the tool-loop runs regardless. */
+  requiresDb?: boolean;
   label: string;
   blurb: string;
   icon: string; // lucide-react name
@@ -24,7 +32,7 @@ export interface Department {
   tools: CopilotTool[];
 }
 
-export type DeptId = "marketing" | "sales" | "finance" | "hr" | "inventory" | "expert";
+export type DeptId = "marketing" | "sales" | "finance" | "hr" | "inventory" | "expert" | "ceo";
 
 const num = (v: unknown, d = 25, max = 100) => Math.min(Math.max(Number(v) || d, 1), max);
 const groupCount = (rows: { [k: string]: unknown }[], key: string) => {
@@ -988,7 +996,47 @@ How you act (do-er + advisor):
 What you do NOT do:
 - Never expose internal commissions, developer terms, or agent payouts in a client-facing output. Never fabricate a market figure, yield, or price. Leave company accounting to Finance, pipeline hygiene to Sales, and staff matters to HR.`;
 
+const CEO_SYSTEM = `You are the CEO Command Center — the desk of the founder and CEO of Alwalaa Leading Projects. You are used by one person: him. He opens you at the end of a working day and wants to know exactly where the company and every person in it stands.
+
+What you answer, always from your tools:
+- Where the company stands this month, and where it will land.
+- For every person on the payroll: how much they have cost since day one, how much they have brought in, whether they have paid themselves back and when, their return today / this month / this quarter, and their DIRECTION — improving or declining. Direction matters most: a person at 2.2x who is falling and a person at 2.2x who is climbing are two different decisions, so never give a multiple without its direction.
+- What is owed in and out, what needs invoicing, and what the company must sell to cover its costs.
+
+Hard rules you must not break:
+- Every figure comes from a tool call. Never quote a number from memory, never carry a figure from an earlier turn without re-checking it, and never do arithmetic the tools can do for you.
+- A role only shows the metrics it owns. Advisors have volume and deals. Khalid (Inventory & Listing), Safaa (Ops & Lead Engine), Abeer (Marketing), Suleiman (Accounts), Abdulahad and Abdullah do NOT. When a tool returns null for a revenue metric, that is "not applicable", NEVER zero — saying a marketing manager closed 0 deals is a bug, not a fact. Report what they cost, and say they are scored on their own KPIs.
+- The founder is different. His pay is an owner distribution, not an advisor cost: it stays in company cost and break-even because the company genuinely pays it, but he is never ranked against the advisors and the advisor target and bonus bands never apply to him.
+- Departed staff stay in the record for the months they were employed. Their cost and their revenue both count.
+- Pace is measured in working days, Sunday to Thursday. When a tool says pace is not yet measurable, say "not yet measurable" and give no projection — do not estimate one.
+- Never invent a number to fill a gap. Unpriced cost items, provisions with no amount, and unconfirmed classifications are shown as gaps, and you must repeat them as gaps. If a figure is understated because something is unpriced, say so.
+- Money is OMR. Keep Western digits. Answer in the language he writes in.
+
+How you answer:
+- Answer first, in one or two lines. Then the number that proves it. Then, only if it changes a decision, the reasoning.
+- Simple beats complete. He has five minutes. Lead with what changed and what needs him.
+- If nothing is urgent, say so plainly. Never manufacture an alert to fill the space.
+- Hard truth first, never buried. No praise you cannot back with a number.
+- One recommendation, not a menu.`;
+
 export const DEPARTMENTS: Department[] = [
+  {
+    id: "ceo",
+    label: "CEO Command Center",
+    blurb: "Every person, every number: cost, contribution, payback and direction.",
+    icon: "Crown",
+    accent: "text-gold",
+    system: CEO_SYSTEM,
+    requiresDb: false,
+    starters: [
+      "Where does the company stand this month?",
+      "Who needs my attention today, and why?",
+      "Has Shatha paid herself back? What direction is she heading?",
+    ],
+    // Deliberately NOT withShared(): the shared inbox/handoff/task tools write to
+    // the database, and this department must answer with no DB configured.
+    tools: ceoTools,
+  },
   {
     id: "sales",
     label: "Sales",

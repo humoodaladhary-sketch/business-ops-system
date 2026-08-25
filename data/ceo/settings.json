@@ -1,0 +1,46 @@
+{
+  "$comment": [
+    "Every number the system leans on, editable and nothing hardcoded.",
+    "",
+    "Bonus bands are half-open [min, max): a volume exactly at the top of the on-target band",
+    "(310,000) counts as above it, not on it. Target 250,000 with a ±60,000 band gives",
+    "on-target = [190,000, 310,000).",
+    "",
+    "holidays is empty until the CEO enters the public holiday calendar. Pacing already excludes",
+    "Fridays and Saturdays; holidays refine it further and belong in settings, not in code."
+  ],
+  "currency": "OMR",
+  "advisorMonthlyTargetOmr": "250000.000",
+  "targetBandOmr": "60000.000",
+  "bonusBands": [
+    {
+      "id": "below",
+      "label": { "en": "Below band", "ar": "دون النطاق" },
+      "minVolumeOmr": "0.000",
+      "maxVolumeOmr": "190000.000",
+      "bonusOmr": "0.000"
+    },
+    {
+      "id": "on-target",
+      "label": { "en": "On target", "ar": "على الهدف" },
+      "minVolumeOmr": "190000.000",
+      "maxVolumeOmr": "310000.000",
+      "bonusOmr": "150.000"
+    },
+    {
+      "id": "above",
+      "label": { "en": "Above target", "ar": "فوق الهدف" },
+      "minVolumeOmr": "310000.000",
+      "maxVolumeOmr": "500000.000",
+      "bonusOmr": "200.000"
+    },
+    {
+      "id": "outstanding",
+      "label": { "en": "Outstanding", "ar": "متميز" },
+      "minVolumeOmr": "500000.000",
+      "maxVolumeOmr": null,
+      "bonusOmr": "250.000"
+    }
+  ],
+  "holidays": []
+}

@@ -1,0 +1,25 @@
+{
+  "$comment": [
+    "Liabilities the system SHOWS but must not invent a number for. An amount of null renders",
+    "as 'amount unknown' and never as zero, and the line stays visible until it is settled or",
+    "dismissed.",
+    "",
+    "The wage re-basing risk is deliberately NOT here: it is a scenario computed from the people",
+    "and the policy (see wageRebasingScenario), not a booked cost."
+  ],
+  "provisions": [
+    {
+      "id": "retroactive-social-insurance",
+      "label": {
+        "en": "Retroactive social-insurance liability (pre-registration period)",
+        "ar": "التزام تأمينات اجتماعية بأثر رجعي (فترة ما قبل التسجيل)"
+      },
+      "amountOmr": null,
+      "flag": {
+        "en": "amount unknown — confirm with SPF",
+        "ar": "المبلغ غير معروف — يُراجع مع صندوق الحماية الاجتماعية"
+      },
+      "status": "open"
+    }
+  ]
+}

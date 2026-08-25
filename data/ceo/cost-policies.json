@@ -1,0 +1,75 @@
+{
+  "$comment": [
+    "Cost policy as effective-dated rows. When the rules change again it is a new row here,",
+    "not an if-statement on the date and not a deploy.",
+    "",
+    "Before September 2026 staff were paid informally and were not registered with the Ministry",
+    "of Labour or the Social Protection Fund: salary and allowance only.",
+    "",
+    "From 1 September 2026 the company registers staff officially and the full statutory cost",
+    "applies. The split below is not a guess — it is the only assignment of Omani/expat status",
+    "that reproduces BOTH published figures at once: the +343.50 OMR monthly payroll increase",
+    "and the 97.75 OMR/month wage re-basing exposure. Both are asserted in the tests."
+  ],
+  "policies": [
+    {
+      "id": "informal-2026-01",
+      "label": { "en": "Informal payroll (unregistered)", "ar": "رواتب غير رسمية (غير مسجلة)" },
+      "effectiveFrom": "2026-01-01",
+      "socialInsurance": null,
+      "endOfService": null,
+      "note": {
+        "en": "Salary and allowance only. Staff not registered with MoL or SPF in this period.",
+        "ar": "الراتب والبدل فقط. الموظفون غير مسجلين لدى وزارة العمل أو صندوق الحماية الاجتماعية في هذه الفترة."
+      },
+      "overheads": [
+        {
+          "id": "operating-overheads",
+          "label": { "en": "Office & operating overheads", "ar": "مصاريف المكتب والتشغيل" },
+          "amountOmr": "550.500"
+        },
+        { "id": "unpriced-1", "label": { "en": "Unpriced cost item 1", "ar": "بند تكلفة غير مسعّر ١" }, "amountOmr": null },
+        { "id": "unpriced-2", "label": { "en": "Unpriced cost item 2", "ar": "بند تكلفة غير مسعّر ٢" }, "amountOmr": null },
+        { "id": "unpriced-3", "label": { "en": "Unpriced cost item 3", "ar": "بند تكلفة غير مسعّر ٣" }, "amountOmr": null },
+        { "id": "unpriced-4", "label": { "en": "Unpriced cost item 4", "ar": "بند تكلفة غير مسعّر ٤" }, "amountOmr": null },
+        { "id": "unpriced-5", "label": { "en": "Unpriced cost item 5", "ar": "بند تكلفة غير مسعّر ٥" }, "amountOmr": null },
+        { "id": "unpriced-6", "label": { "en": "Unpriced cost item 6", "ar": "بند تكلفة غير مسعّر ٦" }, "amountOmr": null },
+        { "id": "unpriced-7", "label": { "en": "Unpriced cost item 7", "ar": "بند تكلفة غير مسعّر ٧" }, "amountOmr": null }
+      ]
+    },
+    {
+      "id": "statutory-2026-09",
+      "label": { "en": "Registered payroll (statutory)", "ar": "رواتب مسجلة (قانونية)" },
+      "effectiveFrom": "2026-09-01",
+      "socialInsurance": {
+        "ratePct": 11.5,
+        "contributoryWageCapOmr": "3000.000",
+        "basis": "basic",
+        "appliesTo": ["OmaniEmployee"]
+      },
+      "endOfService": {
+        "divisor": 12,
+        "basis": "basic",
+        "appliesTo": ["ExpatEmployee"]
+      },
+      "note": {
+        "en": "Employer social insurance 11.5% of basic for Omani staff (capped at a 3,000 OMR contributory wage); end-of-service accrual of basic ÷ 12 per month for expatriate staff. Contractors carry neither.",
+        "ar": "تأمينات اجتماعية على صاحب العمل ١١٫٥٪ من الأساسي للموظفين العمانيين (بحد أقصى أجر اشتراكي ٣٬٠٠٠ ريال)؛ ومخصص نهاية الخدمة بواقع الأساسي ÷ ١٢ شهريًا للموظفين الوافدين. المتعاقدون لا يتحملون أيًّا منهما."
+      },
+      "overheads": [
+        {
+          "id": "operating-overheads",
+          "label": { "en": "Office & operating overheads", "ar": "مصاريف المكتب والتشغيل" },
+          "amountOmr": "550.500"
+        },
+        { "id": "unpriced-1", "label": { "en": "Unpriced cost item 1", "ar": "بند تكلفة غير مسعّر ١" }, "amountOmr": null },
+        { "id": "unpriced-2", "label": { "en": "Unpriced cost item 2", "ar": "بند تكلفة غير مسعّر ٢" }, "amountOmr": null },
+        { "id": "unpriced-3", "label": { "en": "Unpriced cost item 3", "ar": "بند تكلفة غير مسعّر ٣" }, "amountOmr": null },
+        { "id": "unpriced-4", "label": { "en": "Unpriced cost item 4", "ar": "بند تكلفة غير مسعّر ٤" }, "amountOmr": null },
+        { "id": "unpriced-5", "label": { "en": "Unpriced cost item 5", "ar": "بند تكلفة غير مسعّر ٥" }, "amountOmr": null },
+        { "id": "unpriced-6", "label": { "en": "Unpriced cost item 6", "ar": "بند تكلفة غير مسعّر ٦" }, "amountOmr": null },
+        { "id": "unpriced-7", "label": { "en": "Unpriced cost item 7", "ar": "بند تكلفة غير مسعّر ٧" }, "amountOmr": null }
+      ]
+    }
+  ]
+}

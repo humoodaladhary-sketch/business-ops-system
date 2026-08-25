@@ -17,6 +17,7 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "seed:crm:build": "tsx scripts/build-crm-seed.ts",
+    "ceo:verify": "tsx scripts/ceo-verify.ts",
     "db:studio": "prisma studio"
   },
   "prisma": {

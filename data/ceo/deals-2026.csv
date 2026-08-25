@@ -1,0 +1,39 @@
+﻿deal_ref,month,advisor,developer,project,unit_type,unit_value_omr,commission_pct,alwalaa_gross_commission_omr,incentive_omr,referral_payee,referral_pct,referral_amount_omr,agent_cut_pct,agent_amount_omr,company_net_omr,deal_stage,invoiced,collected
+SHA-0002,2026-01,شذى,Alahly Sabbour,Wadi Zaha,2BD Penthouse,139131.719,3.5,4869.61,0,,0,0,35,1704.363,3165.246,SPA_SIGNED,نعم,نعم
+SHA-0003,2026-01,شذى,Alahly Sabbour,Wadi Zaha,Studio,42750.476,3.5,1496.27,0,,0,0,50,748.135,748.135,SPA_SIGNED,نعم,نعم
+SHA-0012,2026-01,شذى,Muriya,Olive Farms,2BD,99000,3,2970,0,,0,0,35,1039.5,1930.5,SPA_SIGNED,نعم,نعم
+WES-0002,2026-01,وسام,AlAbrar,Hay Alwafa,Townhouse A,116495,3,3494.85,0,,0,0,25,873.712,2621.137,SPA_SIGNED,نعم,نعم
+WES-0004,2026-01,وسام,Ahly Sabbour,Wadi Zaha,Studio,42250.48,3.5,1478.77,0,,0,0,25,369.692,1109.077,SPA_SIGNED,نعم,نعم
+WES-0001,2026-01,وسام,AlAbrar,Hay Alwafa,2BHK,81950,3,2458.5,0,,0,0,25,614.625,1843.875,SPA_SIGNED,نعم,نعم
+ALE-0003,2026-02,أليكس,Ahly Sabbour,Wadi Zaha,1BHK,63200,3.5,2212,0,,0,0,25,526.667,1685.333,SPA_SIGNED,نعم,نعم
+ALE-0002,2026-02,أليكس,Ahly Sabbour,Wadi Zaha,2BHK,77000,3.5,2695,0,,0,0,25,641.667,2053.333,SPA_SIGNED,نعم,نعم
+ALE-0004,2026-02,أليكس,Sarooj,Sarooj Oasis,1BHK,61346.25,4,2453.85,0,,0,0,25,613.462,1840.387,SPA_SIGNED,نعم,نعم
+SHA-0004,2026-02,شذى,Sarooj,Sarooj Oasis,1BHK,62914.505,4,2516.58,0,,0,0,35,880.803,1635.777,SPA_SIGNED,نعم,نعم
+SHA-0005,2026-02,شذى,Sarooj,Sarooj Oasis,1BHK,50150,4,2006,0,,0,0,35,702.1,1303.9,SPA_SIGNED,نعم,نعم
+SHA-0006,2026-02,شذى,Sarooj,Sarooj Oasis,Penthouse 3BHK,173920,4,6956.8,0,,0,0,35,2434.88,4521.92,SPA_SIGNED,نعم,نعم
+SHA-0007,2026-02,شذى,Sarooj,Sarooj Oasis,2BHK,92650,4,3706,0,,0,0,35,1297.1,2408.9,SPA_SIGNED,نعم,نعم
+SHA-0008,2026-02,شذى,Sarooj,Sarooj Oasis,1BHK,56100,4,2244,0,,0,0,35,785.4,1458.6,SPA_SIGNED,نعم,نعم
+SHA-0009,2026-02,شذى,Sarooj,Sarooj Oasis,1BHK,56100,4,2244,0,,0,0,35,785.4,1458.6,SPA_SIGNED,نعم,نعم
+SHA-0010,2026-02,شذى,Sarooj,Sarooj Oasis,1BHK,54450,4,2178,0,,0,0,35,762.3,1415.7,SPA_SIGNED,نعم,نعم
+SHA-0013,2026-02,شذى,Alahly Sabbour,Wadi Zaha,3BD Penthouse,143715,3.5,5030.03,0,,0,0,35,1760.511,3269.519,SPA_SIGNED,نعم,نعم
+SHA-0015,2026-02,شذى,Sarooj,Sarooj Oasis,Penthouse 2BHK,117810,4,4712.4,0,,0,0,35,1649.34,3063.06,SPA_SIGNED,نعم,نعم
+WES-0003,2026-02,وسام,Sarooj,Sarooj Oasis,1BHK,51415,4,2056.6,0,,0,0,25,514.15,1542.45,SPA_SIGNED,نعم,نعم
+SHA-0011,2026-03,شذى,Sarooj,Sarooj Oasis,1BHK,52470,4,2098.8,0,,0,0,35,734.58,1364.22,SPA_SIGNED,نعم,نعم
+SHA-0014,2026-03,شذى,Sarooj,Sarooj Oasis,1BHK,52525,4,2101,0,,0,0,35,735.35,1365.65,SPA_SIGNED,نعم,نعم
+SHA-0016,2026-03,شذى,Alahly Sabbour,Wadi Zaha,2BD Penthouse,147000,3.5,5145,0,,0,0,35,1800.75,3344.25,SPA_SIGNED,نعم,نعم
+ALE-0005,2026-04,أليكس,Ahly Sabbour,Wadi Zaha,Studio,53833.333,3.5,1884.17,0,,0,0,25,471.043,1413.128,SPA_SIGNED,نعم,نعم
+PAS-0003,2026-04,باشا,Adante,Yenair,Apartment,80801,3,2424.03,0,,0,0,25,606.008,1818.023,SPA_SIGNED,نعم,نعم
+PAS-0001,2026-04,باشا,Ahly Sabbour,Wadi Zaha,Apartment,78181.8,3.5,2736.36,0,,0,0,50,1368.18,1368.18,SPA_SIGNED,نعم,لا
+SHA-0019,2026-04,شذى,Sarooj,Sarooj Oasis,1BHK,0,0,0,0,,0,0,50,0,0,SPA_SIGNED,لا,لا
+SHA-0020,2026-04,شذى,Alahly Sabbour,Wadi Zaha,Studio,52100,3.5,1823.5,0,,0,0,50,911.75,911.75,SPA_SIGNED,لا,لا
+SHA-0021,2026-04,شذى,AlAbrar,Hay Alwafaa,2BHK,94260,3,2827.8,0,,0,0,50,1413.9,1413.9,SPA_SIGNED,لا,لا
+PAS-0002,2026-05,باشا,Adante,Yenair,Studio,50104,3,1503.12,0,,0,0,25,375.78,1127.34,SPA_SIGNED,نعم,نعم
+PAS-0004,2026-05,باشا,Adante,Yenaier,Studio,63944,3,1918.32,0,,0,0,25,479.58,1438.74,SPA_SIGNED,نعم,لا
+SHA-0017,2026-05,شذى,Adante,Yenaier,Retail,93348,3,2800.44,0,,0,0,35,980.154,1820.286,SPA_SIGNED,نعم,لا
+SHA-0022,2026-05,شذى,Alahly Sabbour,Wadi Zaha,Studio,50900,3.5,1781.5,0,,0,0,50,890.75,890.75,SPA_SIGNED,لا,لا
+SHA-0023,2026-05,شذى,Alahly Sabbour,Wadi Zaha,1BHK,65500,3.5,2292.5,0,,0,0,50,1146.25,1146.25,SPA_SIGNED,لا,لا
+WES-0005,2026-06,وسام,AlAbrar,Hay Alwafa,2BHK,63870,3,1916.1,0,,0,0,25,479.025,1437.075,SPA_SIGNED,نعم,نعم
+HUM-0002,2026-07,حمود,Leo Development,Vistal,2BHK,284260,5,14213,500.0,,0,0,50,7106.5,7606.5,SPA_SIGNED,؟,؟
+HUM-0004,2026-07,حمود,Adante Realty,,2BHK,131280,3.0,3938.4,0,محمد,50,1969.2,50,984.6,984.6,SPA_SIGNED,؟,نعم
+HUM-0003,2026-08,حمود,Bahja Real Estate,,تجاري,32500,3,975,0,,0,0,50,487.5,487.5,SPA_SIGNED,؟,؟
+HUM-0005,2026-08,حمود,Ahly Sabbour,,1BHK,62000,3.5,2170,0,م. بيداء,50,1085.0,50,542.5,542.5,SPA_SIGNED,؟,؟

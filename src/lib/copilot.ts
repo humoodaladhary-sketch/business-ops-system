@@ -63,7 +63,7 @@ const textFrom = (content: unknown): string =>
 
 // Full Anthropic tool-use loop, executing the department's config.ts tools with
 // a live service-role DB client. This is the richest path — real queries.
-async function toolLoop(key: string, db: SupabaseClient, deptId: string, messages: ChatMsg[]): Promise<ChatResult> {
+async function toolLoop(key: string, db: SupabaseClient | null, deptId: string, messages: ChatMsg[]): Promise<ChatResult> {
   const dept = getDepartment(deptId);
   if (!dept) return { error: "unknown_department" };
   const tools = dept.tools.map((x) => ({ name: x.name, description: x.description, input_schema: x.input_schema }));
@@ -82,7 +82,12 @@ async function toolLoop(key: string, db: SupabaseClient, deptId: string, message
         const tool = dept.tools.find((x) => x.name === b.name);
         let out: unknown;
         try {
-          out = tool ? await tool.run(db, b.input ?? {}, deptId) : { error: "unknown tool" };
+          if (!tool) out = { error: "unknown tool" };
+          else if (db === null && tool.needsDb !== false) {
+            out = { error: "This tool needs the database, which is not configured in this deployment." };
+          } else {
+            out = await tool.run(db as SupabaseClient, b.input ?? {}, deptId);
+          }
         } catch (e) {
           out = { error: (e as Error).message };
         }
@@ -150,7 +155,11 @@ export async function runCopilot(deptId: string, messages: ChatMsg[]): Promise<C
   const key = process.env.ANTHROPIC_API_KEY;
   if (key) {
     const db = supabaseAdmin();
-    return db ? toolLoop(key, db, deptId, messages) : groundedChat(key, deptId, messages);
+    // A department whose tools read no database (the CEO Command Center reads the
+    // dataset files and computes through lib/calc) still gets the full tool-loop.
+    const dept = getDepartment(deptId);
+    if (db || dept?.requiresDb === false) return toolLoop(key, db, deptId, messages);
+    return groundedChat(key, deptId, messages);
   }
 
   const webhook = process.env.COPILOT_WEBHOOK_URL;
