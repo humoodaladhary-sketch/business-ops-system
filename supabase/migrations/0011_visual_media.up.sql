@@ -5,7 +5,7 @@
 -- attribution, classification (photo vs render — never conflated), approval,
 -- focal point, alt text — and adds `hero_slides`, the Command Portal's
 -- editorial banner queue (scheduled, prioritized, pinned, audience-scoped).
--- No public buckets: images stay in the private 'alwalaa' bucket and are
+-- No public buckets: images stay in the private ALWALAA bucket and are
 -- served via short-lived signed URLs created server-side.
 -- Requires 0000 (organizations, profiles, files, projects, units).
 -- Additive + reversible: 0011_visual_media.down.sql

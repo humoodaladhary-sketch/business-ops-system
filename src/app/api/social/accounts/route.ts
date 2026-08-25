@@ -69,14 +69,16 @@ export async function POST(req: NextRequest) {
   }
   const p = parsed.data;
 
-  // Upsert the account row.
-  const row = {
+  // Upsert the account row. Optional identity fields are written ONLY when
+  // the caller actually supplied them: a token-only reconnect must never wipe
+  // the stored Page/Business ID (which would break verify and publishing).
+  const row: Record<string, unknown> = {
     organization_id: ORG_ID,
     platform: p.platform,
     handle: p.handle,
-    display_name: p.displayName ?? null,
-    external_account_id: p.externalAccountId ?? null,
   };
+  if (p.displayName !== undefined) row.display_name = p.displayName;
+  if (p.externalAccountId !== undefined) row.external_account_id = p.externalAccountId;
   const upsert = p.id
     ? db.from("social_accounts").update(row).eq("organization_id", ORG_ID).eq("id", p.id).select("id").single()
     : db
@@ -99,19 +101,19 @@ export async function POST(req: NextRequest) {
     if (secErr) return NextResponse.json({ error: "secret_failed", detail: secErr.message.slice(0, 200) });
   }
 
-  // Verify with whatever token is on file (new or existing).
-  const { data: secret } = await db
-    .from("social_account_secrets")
-    .select("access_token")
-    .eq("account_id", acct.id)
-    .maybeSingle();
+  // Verify with whatever token AND account id are on file (new or existing) —
+  // never with the request body, which may legitimately omit both.
+  const [{ data: secret }, { data: stored }] = await Promise.all([
+    db.from("social_account_secrets").select("access_token").eq("account_id", acct.id).maybeSingle(),
+    db.from("social_accounts").select("external_account_id,display_name").eq("id", acct.id).maybeSingle(),
+  ]);
 
   let status = "disconnected";
   let detail = "No access token on file yet.";
   let accountName: string | undefined;
   if (secret?.access_token) {
     const verify = await publisherFor(p.platform).verify(
-      { platform: p.platform, handle: p.handle, externalAccountId: p.externalAccountId ?? null },
+      { platform: p.platform, handle: p.handle, externalAccountId: stored?.external_account_id ?? null },
       secret.access_token,
     );
     status = verify.ok ? "connected" : "error";
@@ -123,7 +125,7 @@ export async function POST(req: NextRequest) {
     .update({
       status,
       status_detail: detail,
-      display_name: accountName ?? p.displayName ?? null,
+      display_name: accountName ?? stored?.display_name ?? null,
       last_verified_at: secret?.access_token ? new Date().toISOString() : null,
     })
     .eq("id", acct.id);

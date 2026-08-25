@@ -40,11 +40,11 @@ export function SocialPulseCard({ pulse }: { pulse: SocialPulse }) {
                 <span className={cn("ms-1.5 text-[11px] font-normal", MUTED)}>{r.handle}</span>
               </p>
               <p className={cn("text-[10px]", MUTED)}>
-                {r.status !== "connected"
-                  ? "Not connected"
-                  : r.capturedAt
-                    ? `${r.source === "manual" ? "manual entry" : "live API"} · ${r.capturedAt.slice(0, 10)}`
-                    : "connected — no snapshot yet"}
+                {r.capturedAt
+                  ? `${r.source === "manual" ? "manual entry" : "live API"} · ${r.capturedAt.slice(0, 10)}`
+                  : r.status === "connected"
+                    ? "connected — no snapshot yet"
+                    : "Not connected"}
               </p>
             </div>
             <div className="shrink-0 text-end">

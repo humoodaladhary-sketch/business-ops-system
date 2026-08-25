@@ -7,7 +7,8 @@ import { z } from "zod";
 import { getSession, isAdmin } from "@/infrastructure/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ORG_ID } from "@/app/_departments/config";
-import { postIdempotencyKey, validatePost } from "@/domain/social/posting";
+import { postIdempotencyKey, resolveDraftWrite, validatePost } from "@/domain/social/posting";
+import type { PostStatus } from "@/domain/social/posting";
 import type { SocialPlatform } from "@/domain/social/platforms";
 import { prisma, hasDatabase } from "@/infrastructure/prisma/client";
 
@@ -97,13 +98,42 @@ export async function POST(req: NextRequest) {
     error: null,
   };
 
+  // The idempotency key is derived from the content, so re-composing an
+  // already-published post produces the SAME key. Never let that write over
+  // published history (it would clear `posted` and re-open the publish gate
+  // on a post that is already live — a duplicate waiting to happen).
+  const { data: clash } = await db
+    .from("social_posts")
+    .select("id,status,external_post_id,posted_at")
+    .eq("organization_id", ORG_ID)
+    .eq("idempotency_key", idempotencyKey)
+    .maybeSingle();
+  const write = resolveDraftWrite({
+    requestedId: p.id ?? null,
+    existing: clash ? { id: clash.id, status: clash.status as PostStatus } : null,
+  });
+  if (write.action === "reject_already_posted") {
+    return NextResponse.json(
+      {
+        error: "already_posted",
+        detail:
+          "This exact post (same account, caption, link and images) was already published" +
+          (clash?.posted_at ? ` on ${clash.posted_at.slice(0, 10)}` : "") +
+          " — change something, or it would be a duplicate.",
+        postId: write.id,
+        externalPostId: clash?.external_post_id ?? null,
+      },
+      { status: 409 },
+    );
+  }
+
   let saved;
-  if (p.id) {
+  if (write.action === "update") {
     const { data, error } = await db
       .from("social_posts")
       .update(row)
       .eq("organization_id", ORG_ID)
-      .eq("id", p.id)
+      .eq("id", write.id)
       .neq("status", "posted") // a published post is immutable history
       .select("id,status")
       .maybeSingle();
@@ -113,10 +143,17 @@ export async function POST(req: NextRequest) {
   } else {
     const { data, error } = await db
       .from("social_posts")
-      .upsert({ ...row, created_by: null }, { onConflict: "organization_id,idempotency_key" })
+      .insert({ ...row, created_by: null })
       .select("id,status")
       .single();
-    if (error) return NextResponse.json({ error: "save_failed", detail: error.message.slice(0, 200) });
+    if (error) {
+      // 23505 = another writer claimed this key between the check and the insert.
+      const conflict = error.code === "23505";
+      return NextResponse.json(
+        { error: conflict ? "already_posted" : "save_failed", detail: error.message.slice(0, 200) },
+        conflict ? { status: 409 } : undefined,
+      );
+    }
     saved = data;
   }
 

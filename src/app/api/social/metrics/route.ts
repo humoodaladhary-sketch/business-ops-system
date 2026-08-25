@@ -55,6 +55,13 @@ export async function POST(req: NextRequest) {
   const p = parsed.data;
 
   if (p.mode === "manual") {
+    const { data: owned } = await db
+      .from("social_accounts")
+      .select("id")
+      .eq("organization_id", ORG_ID)
+      .eq("id", p.accountId)
+      .maybeSingle();
+    if (!owned) return NextResponse.json({ error: "account_not_found" }, { status: 404 });
     const { error } = await db.from("social_metrics_snapshots").insert({
       organization_id: ORG_ID,
       account_id: p.accountId,
@@ -94,7 +101,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, refreshed: 0, detail: "No connected accounts." });
   }
 
-  const results: { accountId: string; ok: boolean; detail: string }[] = [];
+  const results: { accountId: string; ok: boolean; skipped?: boolean; detail: string }[] = [];
   for (const a of accounts) {
     // Cooldown: skip when a fresh API snapshot already exists.
     const { data: last } = await db
@@ -106,7 +113,7 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .maybeSingle();
     if (last && Date.now() - Date.parse(last.captured_at) < REFRESH_COOLDOWN_MS) {
-      results.push({ accountId: a.id, ok: true, detail: "fresh (cooldown)" });
+      results.push({ accountId: a.id, ok: true, skipped: true, detail: "already fresh (cooldown)" });
       continue;
     }
 
@@ -154,5 +161,24 @@ export async function POST(req: NextRequest) {
       /* audit is best-effort */
     }
   }
-  return NextResponse.json({ ok: true, refreshed: results.filter((r) => r.ok).length, results });
+  // Honest reporting: a cooldown skip is not a refresh, and if every account
+  // failed the caller must see the platform's actual error, not a green tick.
+  const refreshed = results.filter((r) => r.ok && !r.skipped).length;
+  const skipped = results.filter((r) => r.skipped).length;
+  const failures = results.filter((r) => !r.ok);
+  const summary = [
+    `${refreshed} updated`,
+    skipped ? `${skipped} already fresh` : null,
+    failures.length ? `${failures.length} failed: ${failures.map((f) => f.detail).join("; ")}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  return NextResponse.json({
+    ok: failures.length === 0,
+    refreshed,
+    skipped,
+    failed: failures.length,
+    detail: summary.slice(0, 400),
+    results,
+  });
 }

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession, isAdmin } from "@/infrastructure/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { MEDIA_BUCKET } from "@/lib/storage";
 import { ORG_ID } from "@/app/_departments/config";
 import { validateAltText, validateUpload } from "@/domain/media/upload";
 import { prisma, hasDatabase } from "@/infrastructure/prisma/client";
@@ -15,7 +16,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const BUCKET = "alwalaa";
 
 const Meta = z.object({
   altText: z.string().min(1).max(400),
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
 
   const storagePath = `media/${Date.now().toString(36)}-${validation.safeName}`;
   const bytes = await file.arrayBuffer();
-  const { error: upErr } = await db.storage.from(BUCKET).upload(storagePath, bytes, {
+  const { error: upErr } = await db.storage.from(MEDIA_BUCKET).upload(storagePath, bytes, {
     contentType: file.type,
     upsert: false,
   });
@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
     .single();
   if (insErr) {
     // Roll the object back so storage never holds unreferenced media.
-    await db.storage.from(BUCKET).remove([storagePath]).catch(() => undefined);
+    await db.storage.from(MEDIA_BUCKET).remove([storagePath]).catch(() => undefined);
     return NextResponse.json({ error: "insert_failed", detail: insErr.message.slice(0, 200) });
   }
 

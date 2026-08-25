@@ -4,6 +4,7 @@ import {
   canPublishLive,
   canTransition,
   postIdempotencyKey,
+  resolveDraftWrite,
   validatePost,
 } from "./posting";
 
@@ -87,5 +88,39 @@ describe("post state machine", () => {
     expect(canTransition("failed", "dry_run_ok")).toBe(true);
     expect(canTransition("posting", "posted")).toBe(true);
     expect(canTransition("posting", "failed")).toBe(true);
+  });
+});
+
+describe("resolveDraftWrite", () => {
+  const posted = { id: "live-1", status: "posted" as const };
+
+  it("refuses to write over a published post that shares the content key", () => {
+    // Re-composing identical content must never reset published history.
+    expect(resolveDraftWrite({ existing: posted })).toEqual({
+      action: "reject_already_posted",
+      id: "live-1",
+    });
+  });
+
+  it("still refuses when the caller is editing a different post", () => {
+    expect(resolveDraftWrite({ requestedId: "other", existing: posted })).toEqual({
+      action: "reject_already_posted",
+      id: "live-1",
+    });
+  });
+
+  it("updates in place when the collision is an unpublished draft", () => {
+    expect(resolveDraftWrite({ existing: { id: "d1", status: "dry_run_ok" } })).toEqual({
+      action: "update",
+      id: "d1",
+    });
+  });
+
+  it("updates the requested post when one was named", () => {
+    expect(resolveDraftWrite({ requestedId: "d9" })).toEqual({ action: "update", id: "d9" });
+  });
+
+  it("inserts when nothing collides", () => {
+    expect(resolveDraftWrite({})).toEqual({ action: "insert" });
   });
 });

@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession, isAdmin } from "@/infrastructure/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { MEDIA_BUCKET } from "@/lib/storage";
 import { ORG_ID } from "@/app/_departments/config";
 import { validateAltText } from "@/domain/media/upload";
 import { prisma, hasDatabase } from "@/infrastructure/prisma/client";
@@ -13,7 +14,6 @@ import { prisma, hasDatabase } from "@/infrastructure/prisma/client";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const BUCKET = "alwalaa";
 
 export async function GET() {
   const s = await getSession();
@@ -36,7 +36,7 @@ export async function GET() {
   const paths = data.map((r) => r.storage_path as string);
   const urlByPath = new Map<string, string>();
   if (paths.length > 0) {
-    const { data: signed } = await db.storage.from(BUCKET).createSignedUrls(paths, 1800);
+    const { data: signed } = await db.storage.from(MEDIA_BUCKET).createSignedUrls(paths, 1800);
     (signed ?? []).forEach((e, i) => {
       if (e.signedUrl && !e.error) urlByPath.set(paths[i], e.signedUrl);
     });

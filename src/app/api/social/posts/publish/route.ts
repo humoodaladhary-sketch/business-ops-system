@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession, isAdmin } from "@/infrastructure/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { MEDIA_BUCKET } from "@/lib/storage";
 import { ORG_ID } from "@/app/_departments/config";
 import { canPublishLive } from "@/domain/social/posting";
 import type { SocialPlatform } from "@/domain/social/platforms";
@@ -19,7 +20,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const BUCKET = "alwalaa";
 const SIGNED_TTL = 3600; // IG fetches the image after we hand over the URL
 
 const Body = z.object({
@@ -101,6 +101,7 @@ export async function POST(req: NextRequest) {
     const { data: files } = await db
       .from("files")
       .select("id,storage_path,approval_status,license_allows_hero,alt_text")
+      .eq("organization_id", ORG_ID)
       .in("id", mediaIds);
     const byId = new Map((files ?? []).map((f) => [f.id, f]));
     const problems: string[] = [];
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "media_not_publishable", detail: problems.join("; ") }, { status: 422 });
     }
     const paths = mediaIds.map((mid) => byId.get(mid)!.storage_path);
-    const { data: signed } = await db.storage.from(BUCKET).createSignedUrls(paths, SIGNED_TTL);
+    const { data: signed } = await db.storage.from(MEDIA_BUCKET).createSignedUrls(paths, SIGNED_TTL);
     imageUrls = (signed ?? []).filter((e) => e.signedUrl && !e.error).map((e) => e.signedUrl as string);
     if (imageUrls.length !== mediaIds.length) {
       return NextResponse.json({ error: "media_sign_failed" }, { status: 422 });

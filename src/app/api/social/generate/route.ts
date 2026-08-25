@@ -81,6 +81,8 @@ export async function POST(req: NextRequest) {
         .from("files")
         .select("id,alt_text,vision_caption,classification,location_label")
         .eq("organization_id", ORG_ID)
+        .eq("approval_status", "approved")
+        .eq("license_allows_hero", true)
         .in("id", p.mediaFileIds);
       mediaContext =
         (files ?? [])

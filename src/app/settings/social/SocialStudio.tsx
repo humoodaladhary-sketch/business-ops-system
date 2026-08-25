@@ -148,10 +148,15 @@ export function SocialStudio() {
         body: JSON.stringify({ mode: "refresh", accountId }),
       });
       const j = await r.json();
+      // The API distinguishes updated / already-fresh / failed — report what
+      // actually happened rather than a blanket success.
       if (j.ok) {
-        say("ok", `Numbers refreshed for ${j.refreshed} account(s).`);
+        say("ok", j.detail ? `Numbers: ${j.detail}.` : `Numbers refreshed for ${j.refreshed ?? 0} account(s).`);
         refresh();
-      } else say("err", j.detail ?? j.error ?? "Refresh failed");
+      } else {
+        say("err", j.detail ?? j.error ?? "Refresh failed");
+        refresh();
+      }
     } finally {
       setBusy(false);
     }

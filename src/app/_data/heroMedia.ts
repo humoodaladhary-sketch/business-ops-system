@@ -1,15 +1,16 @@
 // Server-side loaders for the Command Portal's visual media: the approved
 // media pool (files + governance columns from 0011), published hero slides,
-// and short-lived signed URLs from the PRIVATE 'alwalaa' bucket. Everything
+// and short-lived signed URLs from the PRIVATE media bucket (see
+// MEDIA_BUCKET — Supabase bucket ids are case-sensitive). Everything
 // is null-safe: no database → no imagery → branded fallback art. No public
 // buckets, no hotlinking, no unlicensed pixels.
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { MEDIA_BUCKET } from "@/lib/storage";
 import { ORG_ID } from "../_departments/config";
 import type { MediaAsset } from "@/domain/media/types";
 import { orderSlides, type ScheduledSlide } from "@/domain/media/heroSchedule";
 import { usableOn } from "@/domain/media/rights";
 
-const BUCKET = "alwalaa";
 const SIGNED_URL_TTL_SECONDS = 3600; // per-request render; links outlive the page comfortably
 
 interface FileRow {
@@ -152,7 +153,7 @@ export async function signStoragePaths(paths: string[]): Promise<Map<string, str
   const db = supabaseAdmin();
   if (!db || paths.length === 0) return map;
   const unique = [...new Set(paths)];
-  const { data, error } = await db.storage.from(BUCKET).createSignedUrls(unique, SIGNED_URL_TTL_SECONDS);
+  const { data, error } = await db.storage.from(MEDIA_BUCKET).createSignedUrls(unique, SIGNED_URL_TTL_SECONDS);
   if (error || !data) return map;
   data.forEach((entry, i) => {
     if (entry.signedUrl && !entry.error) map.set(unique[i], entry.signedUrl);
