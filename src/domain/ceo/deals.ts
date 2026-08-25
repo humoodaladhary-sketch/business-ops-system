@@ -26,9 +26,42 @@ export function agentShare(deal: Deal): Baisa {
   return deal.agentAmountBaisa;
 }
 
-/** Recompute the agent cut from percentages — used to audit imported rows. */
+/**
+ * Recompute the agent cut from percentages — used to audit imported rows.
+ *
+ * The referral comes off the top FIRST, and the advisor takes their cut of what
+ * is left. Both referral deals in the 2026 book confirm it exactly: HUM-0004 is
+ * 50% of (3,938.400 − 1,969.200) = 984.600, and HUM-0005 is 50% of
+ * (2,170.000 − 1,085.000) = 542.500. Computing the cut on gross would overstate
+ * the advisor's share on every referred deal and flag both as errors.
+ */
 export function expectedAgentAmount(deal: Deal): Baisa {
-  return applyPct(deal.grossCommissionBaisa, deal.agentCutPct);
+  return applyPct(deal.grossCommissionBaisa - deal.referralBaisa, deal.agentCutPct);
+}
+
+/**
+ * Deals whose recorded agent cut does not match their own stated percentage.
+ * This is a data-quality report on the source sheet, not a correction:
+ * `companyNet` always uses the recorded amounts, because those are what was
+ * actually paid and what the published figures are built from.
+ */
+export function agentCutAnomalies(
+  deals: readonly Deal[],
+  opts: { toleranceBaisa?: number } = {},
+): { deal: Deal; recordedBaisa: Baisa; expectedBaisa: Baisa; differenceBaisa: Baisa }[] {
+  // One baisa of drift is the source sheet's own float rounding, not an anomaly.
+  const tolerance = opts.toleranceBaisa ?? 1;
+  return deals
+    .map((deal) => {
+      const expectedBaisa = expectedAgentAmount(deal);
+      return {
+        deal,
+        recordedBaisa: deal.agentAmountBaisa,
+        expectedBaisa,
+        differenceBaisa: expectedBaisa - deal.agentAmountBaisa,
+      };
+    })
+    .filter((r) => Math.abs(r.differenceBaisa) > tolerance);
 }
 
 /** Difference between the source sheet's net and the formula's net, in baisa. */
@@ -130,9 +163,18 @@ export function openReferralLiabilities(
     .sort((a, b) => b.amountBaisa - a.amountBaisa);
 }
 
-/** Deals closed but not yet invoiced — the first stage of the cash gap. */
+/**
+ * Deals closed but not yet invoiced — the first stage of the cash gap.
+ *
+ * A deal whose money has already arrived is never awaiting an invoice, even
+ * when the invoice column says "unknown". HUM-0004 is exactly that case:
+ * collected, with its invoicing state never recorded. Listing it here would put
+ * an already-paid deal on the CEO's "invoices to send" tick-list.
+ */
 export function awaitingInvoice(deals: readonly Deal[]): Deal[] {
-  return deals.filter((d) => d.stage === "SPA_SIGNED" && d.invoiced !== "yes");
+  return deals.filter(
+    (d) => d.stage === "SPA_SIGNED" && d.invoiced !== "yes" && d.collected !== "yes",
+  );
 }
 
 /** Invoiced but not yet collected — the second stage of the cash gap. */

@@ -131,6 +131,34 @@ all twelve people, the company row (38 deals · 3,091,226 volume · 69,556 in ·
 figures (231,122 / 246,388), the referral liabilities (1,969.20 + 1,085.00 = 3,054.20),
 and the payback months (Shatha January · Wesam January · Alex February · Humood not yet).
 
+## Audit findings (fixed)
+
+An adversarial pass over the parts the acceptance test does not reach found four
+real defects. None moved a published figure; all four are locked by regression tests.
+
+1. **The referral comes off the top before the advisor's cut.** `expectedAgentAmount`
+   computed the cut on gross, which is wrong for referred deals and flagged both of
+   them as errors. Both referral deals confirm the real rule exactly: HUM-0004 is
+   50% of (3,938.400 − 1,969.200) = 984.600, HUM-0005 is 50% of
+   (2,170.000 − 1,085.000) = 542.500.
+
+2. **A collected deal was listed as awaiting an invoice.** HUM-0004 has been paid but
+   its invoicing state was never recorded, so it appeared on the "invoices to send"
+   tick-list. `awaitingInvoice` now excludes anything already collected.
+
+3. **The founder was being measured against the advisor bonus scheme.** His card
+   showed "band: above target" — a bonus that does not exist, against a quota he was
+   never set. `isBonusEligible` is now advisors only; his volume and projection are
+   still shown, per the brief.
+
+4. **A negative month fell into no bonus band at all**, rendering as "no band" rather
+   than "no bonus". The lowest band now catches anything beneath it.
+
+The same pass surfaced a **data-quality finding, not a code defect**: two of Alex's
+deals (ALE-0002, ALE-0003) record an agent cut of unit value ÷ 120 rather than 25% of
+gross — **58.416 OMR** of under-paid advisor cut. `agentCutAnomalies()` reports it.
+The published figures are untouched: the recorded amounts are what was actually paid.
+
 ## What is deliberately not here
 
 Screens. Per the build order, nothing else starts until this passes — and it does.

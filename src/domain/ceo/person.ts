@@ -33,6 +33,19 @@ export function isRankedAgainstAdvisors(person: Person): boolean {
   return person.personClass === "Advisor";
 }
 
+/**
+ * Whether the advisor target and bonus bands apply to this person.
+ *
+ * Advisors only. The founder sells, so his volume is real and is shown — but
+ * the 250,000 target and the 0/150/200/250 bands are an advisor incentive
+ * scheme, and his pay is an owner distribution, not a salary with a bonus on
+ * top. Showing him "band: above target" would invent a bonus that does not
+ * exist and measure him against a quota he was never set.
+ */
+export function isBonusEligible(person: Person): boolean {
+  return person.personClass === "Advisor";
+}
+
 export function isActiveOn(person: Person, asOf: IsoDate): boolean {
   if (person.endedAt !== null && person.endedAt < asOf) return false;
   return person.measurementStartDate <= asOf;
@@ -249,19 +262,28 @@ export function projection(actualBaisa: Baisa, pace: Pace): Baisa | null {
   return Math.round(actualBaisa / pace.fraction);
 }
 
-/** The bonus band a volume falls into. Bands come from settings, never from code. */
+/**
+ * The bonus band a volume falls into. Bands come from settings, never from code.
+ * Anything below the lowest band's floor falls into that lowest band — a
+ * negative month (a reversal or a cancelled deal) is still "below target", and
+ * returning null there would render as "no band" rather than "no bonus".
+ */
 export function bandFor(volumeBaisa: Baisa, bands: readonly BonusBand[]): BonusBand | null {
+  if (bands.length === 0) return null;
   for (const band of bands) {
     const aboveMin = volumeBaisa >= band.minVolumeBaisa;
     const belowMax = band.maxVolumeBaisa === null || volumeBaisa < band.maxVolumeBaisa;
     if (aboveMin && belowMax) return band;
   }
-  return null;
+  const lowest = bands.reduce((a, b) => (b.minVolumeBaisa < a.minVolumeBaisa ? b : a));
+  return volumeBaisa < lowest.minVolumeBaisa ? lowest : null;
 }
 
 export interface MonthPerformance {
   month: MonthKey;
   revenueScored: boolean;
+  /** Whether the advisor target and bonus bands apply. False for the founder. */
+  bonusEligible: boolean;
   pace: Pace;
   volumeBaisa: Baisa | null;
   targetBaisa: Baisa | null;
@@ -290,20 +312,24 @@ export function monthPerformance(
   const revenueScored = c.revenueScored;
   const totals = c.deals ?? (revenueScored ? ZERO_TOTALS : null);
   const volumeBaisa = totals ? totals.volumeBaisa : null;
-  const targetBaisa = revenueScored ? settings.advisorMonthlyTargetBaisa : null;
+  // Volume and projection are shown for anyone who sells, the founder included.
+  // Target and bands are the advisor incentive scheme and stop at advisors.
+  const bonusEligible = isBonusEligible(person);
+  const targetBaisa = bonusEligible ? settings.advisorMonthlyTargetBaisa : null;
 
   const projected = volumeBaisa === null ? null : projection(volumeBaisa, pace);
   return {
     month,
     revenueScored,
+    bonusEligible,
     pace,
     volumeBaisa,
     targetBaisa,
     paceIndex:
       volumeBaisa === null || targetBaisa === null ? null : paceIndex(volumeBaisa, targetBaisa, pace),
     projectedVolumeBaisa: projected,
-    currentBand: volumeBaisa === null ? null : bandFor(volumeBaisa, settings.bonusBands),
-    projectedBand: projected === null ? null : bandFor(projected, settings.bonusBands),
+    currentBand: volumeBaisa === null || !bonusEligible ? null : bandFor(volumeBaisa, settings.bonusBands),
+    projectedBand: projected === null || !bonusEligible ? null : bandFor(projected, settings.bonusBands),
     costBaisa: c.costBaisa,
     contributionBaisa: c.netBaisa,
     deals: totals,
