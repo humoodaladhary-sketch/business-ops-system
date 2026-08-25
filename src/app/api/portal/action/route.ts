@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assign, claim, pass, updateStage, getState } from "@/app/_data/assignment";
+import { getSession } from "@/infrastructure/auth/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Reassigning and re-staging leads is a privileged write and the response echoes
+// assignment state, so it is session-gated. It was previously unauthenticated.
 export async function POST(req: NextRequest) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+
   const body = await req.json().catch(() => null);
   if (!body || typeof body.action !== "string" || typeof body.leadId !== "string") {
     return NextResponse.json({ error: "expected { action, leadId, ... }" }, { status: 400 });

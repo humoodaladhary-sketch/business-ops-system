@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma, hasDatabase } from "@/infrastructure/prisma/client";
 import { isSupabaseConfigured } from "@/infrastructure/auth/session";
 import { adminConfigured } from "@/infrastructure/auth/admin";
+import { ownerGateEnabled } from "@/infrastructure/auth/ownerGate";
+import { internalTokenConfigured } from "@/infrastructure/auth/internalToken";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +19,10 @@ export async function GET() {
       provider: isSupabaseConfigured() ? "supabase" : "preview",
       adminApiConfigured: adminConfigured(),
       superAdminSeedConfigured: Boolean(process.env.SUPER_ADMIN_EMAIL && process.env.SUPER_ADMIN_PASSWORD),
+      // Whether the app is passcode-locked. `false` means anyone with the URL
+      // gets an owner-level view — surfaced here so it is never a silent state.
+      ownerGate: ownerGateEnabled() ? "locked" : "open",
+      internalTokenConfigured: internalTokenConfigured(),
     },
     database: { configured: hasDatabase, reachable: false as boolean, seeded: false as boolean },
   };

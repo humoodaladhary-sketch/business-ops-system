@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AGENTS } from "../_data/dataset";
+import { AGENT_NAME_BY_ID } from "../_data/agent-directory";
 import { ROUTING_POOL, type Assignment } from "../_data/assignment";
 import { Card, Badge } from "../components/ui";
 
-const NAME = new Map(AGENTS.map((a) => [a.id, a.name]));
+const NAME = AGENT_NAME_BY_ID;
 const POOL = ROUTING_POOL.map((id) => ({ id, name: NAME.get(id) ?? id }));
 const STAGES = ["ENGAGED", "VIEWING", "NEGOTIATION", "RESERVATION", "CLOSED_WON", "CLOSED_LOST"];
 

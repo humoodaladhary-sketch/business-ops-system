@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AGENTS, type LeadRecord } from "../_data/dataset";
+import type { LeadRecord } from "../_data/dataset";
+import { AGENT_DIRECTORY, AGENT_NAME_BY_ID } from "../_data/agent-directory";
 import { phoneMeta } from "../lib/phone";
 import { STAGE_LABELS, type CanonicalStage } from "@/domain";
 import { Badge } from "../components/ui";
 import { cn } from "../lib/cn";
 
-const AGENT_NAME = new Map(AGENTS.map((a) => [a.id, a.name]));
+const AGENT_NAME = AGENT_NAME_BY_ID;
 
 const STAGE_VARIANT: Record<string, string> = {
   NEW: "muted",
@@ -58,7 +59,7 @@ export function LeadsTable({ leads, showAgentFilter = true }: { leads: LeadRecor
           className="w-72 rounded-md border border-hairline bg-ink-100 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-gold/50 focus:outline-none"
         />
         {showAgentFilter && (
-          <Select value={agent} onChange={setAgent} options={[["ALL", "All agents"] as [string, string], ...AGENTS.map((a) => [a.id, a.name] as [string, string])]} />
+          <Select value={agent} onChange={setAgent} options={[["ALL", "All agents"] as [string, string], ...AGENT_DIRECTORY.map((a) => [a.id, a.name] as [string, string])]} />
         )}
         <Select value={stage} onChange={setStage} options={[["ALL", "All stages"] as [string, string], ...(Object.keys(STAGE_LABELS) as CanonicalStage[]).map((s) => [s, STAGE_LABELS[s]] as [string, string])]} />
         <Select value={country} onChange={setCountry} options={[["ALL", "All countries"] as [string, string], ...countries.map((c) => [c, c] as [string, string])]} />

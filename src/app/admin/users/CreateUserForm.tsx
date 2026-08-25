@@ -15,6 +15,10 @@ export function CreateUserForm({ agents }: { agents: { id: string; name: string 
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("AGENT");
   const [agentId, setAgentId] = useState(agents[0]?.id ?? "");
+  // Creating a login mints a real Supabase account, so the endpoint requires
+  // INTERNAL_API_TOKEN as well as an admin session — the same token the guided
+  // /setup page asks for. It is held in component state only, never persisted.
+  const [token, setToken] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -24,7 +28,7 @@ export function CreateUserForm({ agents }: { agents: { id: string; name: string 
     setMsg(null);
     const r = await fetch("/api/admin/users", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-internal-token": token },
       body: JSON.stringify({ email, password, role, agentId: role === "AGENT" ? agentId : null }),
     });
     const j = await r.json().catch(() => ({}));
@@ -65,6 +69,21 @@ export function CreateUserForm({ agents }: { agents: { id: string; name: string 
             </select>
           </div>
         )}
+      </div>
+      <div>
+        <label className="mb-1 block text-xs text-white/50">Setup token</label>
+        <input
+          type="password"
+          required
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder="INTERNAL_API_TOKEN"
+          autoComplete="off"
+          className={field}
+        />
+        <p className="mt-1 text-[11px] text-white/35">
+          The value of INTERNAL_API_TOKEN from your Vercel environment variables.
+        </p>
       </div>
       {msg && <p className={msg.ok ? "text-sm text-emerald-300" : "text-sm text-risk"}>{msg.text}</p>}
       <button disabled={busy} className="w-full rounded-md bg-gold px-4 py-2.5 font-medium text-ink transition hover:bg-gold-soft disabled:opacity-60">

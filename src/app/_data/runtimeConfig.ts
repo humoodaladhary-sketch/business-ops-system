@@ -39,7 +39,7 @@ const DEFAULT_DEV_RATES: DevRate[] = [
   { developer: "Dar Global", ratePct: 3 },
 ];
 
-const DEFAULT_UNITS: InventoryUnit[] = [
+export const DEFAULT_UNITS: InventoryUnit[] = [
   { id: "u-wz-st1", project: "Wadi Zaha", developer: "Ahly Sabbour", unitType: "Studio", bedrooms: 0, priceOMR: 52000, status: "AVAILABLE", published: true },
   { id: "u-wz-1b1", project: "Wadi Zaha", developer: "Ahly Sabbour", unitType: "1BHK", bedrooms: 1, priceOMR: 65500, status: "AVAILABLE", published: true },
   { id: "u-so-1b1", project: "Sarooj Oasis", developer: "Sarooj Development", unitType: "1BHK", bedrooms: 1, priceOMR: 56100, status: "AVAILABLE", published: true },
