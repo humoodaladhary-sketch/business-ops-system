@@ -181,12 +181,24 @@ computed from the record rather than recalled from a prompt.
 | `settings_and_scenarios` | targets, bands, policies, the re-basing scenario |
 | `bonus_check` | which band a volume falls in and what the next one needs |
 
-**Live, in the sense that matters.** `src/lib/ceoData.ts` reads `data/ceo/` at request
-time behind a 15-second cache and re-parses only when the files actually change. Nothing
-is snapshotted into a prompt or baked in at build time, so editing the seed changes the
-next answer with no deploy. `next.config.mjs` traces `data/ceo/**` into the copilot
-function, which the build verifies. When the CEO schema lands, only `readDataFiles`
+**Recomputed per request.** `src/lib/ceoData.ts` reads `data/ceo/` at request time behind
+a 15-second cache and re-parses only when the files actually change. Nothing is
+snapshotted into a prompt or baked in at build time, so every figure is derived fresh from
+the current source of record. Running locally, an edit to a seed file changes the next
+answer with no restart. On Vercel the function filesystem is immutable, so a seed edit
+still needs a redeploy to take effect — "live" there means recomputed from the deployed
+data, not reflecting un-deployed edits. When the CEO schema lands, only `readDataFiles`
 changes — every tool stays put.
+
+**A note on file tracing, paid for the hard way.** The five reads use literal paths in a
+single expression (`readFileSync(join(process.cwd(), "data/ceo/people.json"), ...)`). The
+build's file tracer resolves those statically and ships the files with the copilot
+function on its own — no config required. The first attempt instead used
+`outputFileTracingIncludes: { "/api/copilot": ["./data/ceo/**"] }`; that glob traced the
+entire repository root, `.git` objects and the build output included, into *every*
+serverless function, took the largest from 17 MB to 442 MB and failed the Vercel deploy
+against its 250 MB limit. A path built from a variable causes the same sweep. Both are
+guarded by `src/lib/nextConfig.test.ts`.
 
 **It runs without a database.** The tools read no DB, so they carry `needsDb: false` and
 the department is `requiresDb: false`; `runCopilot` now runs the full tool-loop for such a

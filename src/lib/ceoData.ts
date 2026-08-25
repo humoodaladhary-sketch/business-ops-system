@@ -17,9 +17,43 @@ import { loadDataset, type CeoDataset } from "@/lib/calc";
 /** How long a parsed dataset is reused before the files are read again. */
 export const CEO_DATA_TTL_MS = 15_000;
 
-const CEO_DATA_DIR = ["data", "ceo"] as const;
-
 export class CeoDataError extends Error {}
+
+/**
+ * Read one data file.
+ *
+ * Every call site below passes a literal path built from `process.cwd()` in a
+ * single expression. That is load-bearing, not style:
+ *
+ *   - Literal paths let the build's file tracer resolve them statically, so the
+ *     five data files ship with the copilot function automatically. No
+ *     `outputFileTracingIncludes` entry is needed, and none should be added.
+ *   - A path assembled from a variable is opaque to the tracer, which
+ *     compensates by sweeping the entire repository root — `.git` objects and
+ *     the build output included — into EVERY serverless function. That is not
+ *     hypothetical: it took the largest function from 17 MB to 442 MB and failed
+ *     a Vercel deploy against the 250 MB limit.
+ *
+ * If you add a file here, add it as another literal line.
+ */
+function read(absolutePath: string, label: string): string {
+  try {
+    return readFileSync(absolutePath, "utf8");
+  } catch (e) {
+    throw new CeoDataError(
+      `Could not read ${label} — the CEO dataset is not available in this deployment. ` +
+        `(${(e as Error).message})`,
+    );
+  }
+}
+
+function parse(label: string, text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new CeoDataError(`${label} is not valid JSON: ${(e as Error).message}`);
+  }
+}
 
 let cache: { dataset: CeoDataset; loadedAt: number; fingerprint: string } | null = null;
 
@@ -31,39 +65,20 @@ function readDataFiles(): {
   dealsCsv: string;
   fingerprint: string;
 } {
-  const dir = join(process.cwd(), ...CEO_DATA_DIR);
-  const read = (name: string): string => {
-    try {
-      return readFileSync(join(dir, name), "utf8");
-    } catch (e) {
-      throw new CeoDataError(
-        `Could not read ${join(...CEO_DATA_DIR, name)} — the CEO dataset is not available in this ` +
-          `deployment. (${(e as Error).message})`,
-      );
-    }
-  };
-  const files = {
-    people: read("people.json"),
-    costPolicies: read("cost-policies.json"),
-    settings: read("settings.json"),
-    provisions: read("provisions.json"),
-    deals: read("deals-2026.csv"),
-  };
-  const parse = (name: string, text: string): unknown => {
-    try {
-      return JSON.parse(text);
-    } catch (e) {
-      throw new CeoDataError(`${name} is not valid JSON: ${(e as Error).message}`);
-    }
-  };
+  const people = read(join(process.cwd(), "data/ceo/people.json"), "data/ceo/people.json");
+  const costPolicies = read(join(process.cwd(), "data/ceo/cost-policies.json"), "data/ceo/cost-policies.json");
+  const settings = read(join(process.cwd(), "data/ceo/settings.json"), "data/ceo/settings.json");
+  const provisions = read(join(process.cwd(), "data/ceo/provisions.json"), "data/ceo/provisions.json");
+  const deals = read(join(process.cwd(), "data/ceo/deals-2026.csv"), "data/ceo/deals-2026.csv");
+
   return {
-    peopleJson: parse("people.json", files.people),
-    costPoliciesJson: parse("cost-policies.json", files.costPolicies),
-    settingsJson: parse("settings.json", files.settings),
-    provisionsJson: parse("provisions.json", files.provisions),
-    dealsCsv: files.deals,
+    peopleJson: parse("data/ceo/people.json", people),
+    costPoliciesJson: parse("data/ceo/cost-policies.json", costPolicies),
+    settingsJson: parse("data/ceo/settings.json", settings),
+    provisionsJson: parse("data/ceo/provisions.json", provisions),
+    dealsCsv: deals,
     // Cheap change-detector: total length of every source file.
-    fingerprint: Object.values(files).map((t) => t.length).join(":"),
+    fingerprint: [people, costPolicies, settings, provisions, deals].map((t) => t.length).join(":"),
   };
 }
 
