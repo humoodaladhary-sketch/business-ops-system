@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AGENTS, type DealRecord } from "../_data/dataset";
+import type { DealRecord } from "../_data/dataset";
+import { AGENT_DIRECTORY, AGENT_NAME_BY_ID } from "../_data/agent-directory";
 import { formatOMR, formatRate } from "../lib/format";
 import { Badge } from "../components/ui";
 
-const AGENT_NAME = new Map(AGENTS.map((a) => [a.id, a.name]));
+const AGENT_NAME = AGENT_NAME_BY_ID;
 
 export function DealsTable({ deals, showAgentFilter = true }: { deals: DealRecord[]; showAgentFilter?: boolean }) {
   const [agent, setAgent] = useState("ALL");
@@ -33,7 +34,7 @@ export function DealsTable({ deals, showAgentFilter = true }: { deals: DealRecor
         {showAgentFilter && (
           <select value={agent} onChange={(e) => setAgent(e.target.value)} className="rounded-md border border-hairline bg-ink-100 px-2.5 py-2 text-sm text-white/80 focus:border-gold/50 focus:outline-none">
             <option value="ALL">All agents</option>
-            {AGENTS.filter((a) => deals.some((d) => d.agentId === a.id)).map((a) => (
+            {AGENT_DIRECTORY.filter((a) => deals.some((d) => d.agentId === a.id)).map((a) => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </select>
